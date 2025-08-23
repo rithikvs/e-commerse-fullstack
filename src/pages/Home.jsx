@@ -5,7 +5,7 @@ const staticProducts = [
   {
     id: 1,
     name: 'Handwoven Basket',
-    price: '₹499',
+    price: '499',
     material: 'Natural Jute',
     rating: 4.5,
     image: 'download.jpeg'
@@ -13,7 +13,7 @@ const staticProducts = [
   {
     id: 2,
     name: 'Clay Pot',
-    price: '₹299',
+    price: '299',
     material: 'clay',
     rating: 4.2,
     image: 'clay pot.jpeg'
@@ -21,7 +21,7 @@ const staticProducts = [
   {
     id: 3,
     name: 'Jewelry Box',
-    price: '₹799',
+    price: '799',
     material: 'Wooden',
     rating: 4.8,
     image: 'jwellery.jpeg'
@@ -29,7 +29,7 @@ const staticProducts = [
   {
     id: 4,
     name: 'Bamboo Lamp',
-    price: '₹1299',
+    price: '1299',
     material: 'Bamboo',
     rating: 4.6,
     image: 'bamboo.jpeg'
@@ -37,7 +37,7 @@ const staticProducts = [
   {
     id: 5,
     name: 'Coffee Cup',
-    price: '₹199',
+    price: '199',
     material: 'ceramic',
     rating: 4.1,
     image: 'coffee.jpeg'
@@ -125,7 +125,10 @@ function Home({ addToCart }) {
               </div>
               <div style={styles.cardContent}>
                 <h3 style={styles.productName}>{product.name}</h3>
-                <p style={styles.price}><strong>₹</strong>{product.price}</p>
+                <p style={styles.price}>
+                  <strong>₹</strong>
+                  {String(product.price).replace(/^₹+/, '')}
+                </p>
                 <p style={styles.material}>Material: {product.material}</p>
                 <p style={styles.rating}>Rating: ⭐ {product.rating}</p>
                 <p style={styles.stock}>Stock: {typeof product.stock === 'number' ? product.stock : (product.inStock ? 'Available' : 0)}</p>
