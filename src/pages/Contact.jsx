@@ -12,17 +12,17 @@ function Contact() {
         <div style={styles.contactInfo}>
           <div style={styles.contactItem}>
             <h3 style={styles.contactTitle}>📧 Email</h3>
-            <p style={styles.contactText}>handmade@example.com</p>
+            <p style={styles.contactText}>rithikvs08@gmail.com</p>
           </div>
           
           <div style={styles.contactItem}>
             <h3 style={styles.contactTitle}>📱 Phone</h3>
-            <p style={styles.contactText}>+91 98765 43210</p>
+            <p style={styles.contactText}>+91 7708552461</p>
           </div>
           
           <div style={styles.contactItem}>
             <h3 style={styles.contactTitle}>📍 Address</h3>
-            <p style={styles.contactText}>123 Craft Street, Artisan District, City - 123456</p>
+            <p style={styles.contactText}>21,leo nagar,2nd cross,karur-639108</p>
           </div>
           
           <div style={styles.contactItem}>

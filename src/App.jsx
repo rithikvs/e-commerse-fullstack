@@ -54,7 +54,23 @@ function App() {
   };
 
   const addToCart = (product) => {
-    const updated = [...cartItems, product];
+    // Find if product already exists in cart (by productId, _id, or id)
+    const productId = product._id || product.id;
+    const existingIndex = cartItems.findIndex(
+      item => (item.productId || item._id || item.id) === productId
+    );
+    let updated;
+    if (existingIndex !== -1) {
+      // Increase quantity
+      updated = cartItems.map((item, idx) =>
+        idx === existingIndex
+          ? { ...item, quantity: (item.quantity || 1) + 1 }
+          : item
+      );
+    } else {
+      // Add new product with quantity 1
+      updated = [...cartItems, { ...product, quantity: 1 }];
+    }
     setCartItems(updated);
     saveCartToDB(updated);
     alert(`${product.name} has been added to your cart.`);
