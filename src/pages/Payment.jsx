@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 function Payment() {
+  const [paymentMethod, setPaymentMethod] = useState('Credit Card');
+
+  const handlePaymentMethodChange = (e) => {
+    setPaymentMethod(e.target.value);
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.content}>
@@ -37,7 +43,7 @@ function Payment() {
           
           <div style={styles.formGroup}>
             <label style={styles.label}>Payment Method</label>
-            <select style={styles.input}>
+            <select style={styles.input} value={paymentMethod} onChange={handlePaymentMethodChange}>
               <option>Credit Card</option>
               <option>Debit Card</option>
               <option>UPI</option>
@@ -47,6 +53,24 @@ function Payment() {
           
           <button type="submit" className="button" style={styles.button}>Place Order</button>
         </form>
+
+        {/* Show QR code if UPI is selected */}
+        {paymentMethod === 'UPI' && (
+          <div style={styles.qrSection}>
+            <h3 style={styles.qrTitle}>Scan & Pay via UPI</h3>
+            <img
+              src="/Rithik_UPI_QR.jpg" // Make sure this image exists in your public folder
+              alt="UPI QR Code"
+              style={styles.qrImage}
+            />
+            <div style={styles.qrDetails}>
+              <div><b>UPI ID:</b> jeyarithik2111@okhdfcbank</div>
+              <div style={{ fontSize: '0.95em', color: '#6c757d', marginTop: '8px' }}>
+                Scan to pay with any UPI app
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -124,6 +148,31 @@ const styles = {
     lineHeight: '20px',
     outline: 'none',
     boxSizing: 'border-box'
+  },
+  qrSection: {
+    marginTop: '40px',
+    textAlign: 'center',
+    background: '#f8f9fa',
+    borderRadius: '16px',
+    padding: '30px 20px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.07)'
+  },
+  qrTitle: {
+    fontSize: '1.3em',
+    color: '#3498db',
+    marginBottom: '18px'
+  },
+  qrImage: {
+    width: '260px',
+    height: '260px',
+    objectFit: 'contain',
+    marginBottom: '16px',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+  },
+  qrDetails: {
+    fontSize: '1.1em',
+    color: '#2c3e50'
   }
 };
 
