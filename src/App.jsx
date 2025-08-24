@@ -77,6 +77,11 @@ function App() {
     setCartItems([]);
   };
 
+  // Save cart to localStorage whenever cartItems changes
+  useEffect(() => {
+    localStorage.setItem('cartItems', JSON.stringify(cartItems));
+  }, [cartItems]);
+
   return (
     <Router>
       <div>
@@ -109,7 +114,7 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/cart" element={<Cart cartItems={cartItems} removeFromCart={removeFromCart} />} />
-          <Route path="/payment" element={<Payment />} />
+          <Route path="/payment" element={<Payment cartItems={cartItems} />} />
           <Route path="/sell" element={<Sell user={user} />} />
           <Route path="/login" element={<LoginRegister onLogin={handleLogin} />} />
           <Route path="/admin" element={<AdminPanel />} />

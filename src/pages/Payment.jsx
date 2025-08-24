@@ -1,7 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function Payment() {
+function Payment({ cartItems: propCartItems }) {
   const [paymentMethod, setPaymentMethod] = useState('Credit Card');
+  const [totalAmount, setTotalAmount] = useState(0);
+
+  useEffect(() => {
+    // Prefer cartItems from props (App state), fallback to localStorage
+    let cartItems = propCartItems;
+    if (!cartItems || cartItems.length === 0) {
+      cartItems = JSON.parse(localStorage.getItem('cartItems')) || [];
+    }
+    const total = cartItems.reduce((sum, item) => {
+      const price = Number(String(item.price).replace(/[^0-9.]/g, ''));
+      return sum + price * (item.quantity || 1);
+    }, 0);
+    setTotalAmount(total);
+  }, [propCartItems]);
 
   const handlePaymentMethodChange = (e) => {
     setPaymentMethod(e.target.value);
@@ -50,7 +64,15 @@ function Payment() {
               <option>Cash on Delivery</option>
             </select>
           </div>
-          
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Total Amount</label>
+            <input
+              type="text"
+              value={`₹${totalAmount.toFixed(2)}`}
+              style={styles.input}
+              readOnly
+            />
+          </div>
           <button type="submit" className="button" style={styles.button}>Place Order</button>
         </form>
 
@@ -65,8 +87,11 @@ function Payment() {
             />
             <div style={styles.qrDetails}>
               <div><b>UPI ID:</b> jeyarithik2111@okhdfcbank</div>
+              <div style={{ fontSize: '1.1em', color: '#e74c3c', marginTop: '10px', fontWeight: 'bold' }}>
+                <b>Amount to Pay: ₹{totalAmount.toFixed(2)}</b>
+              </div>
               <div style={{ fontSize: '0.95em', color: '#6c757d', marginTop: '8px' }}>
-                Scan to pay with any UPI app
+                Scan to pay with any UPI app. Please pay the exact amount shown above.
               </div>
             </div>
           </div>
