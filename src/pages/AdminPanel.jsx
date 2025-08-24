@@ -294,49 +294,51 @@ function AdminPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u, idx) => {
-                    const userProducts = getUserProducts(u.email);
-                    const userCart = getUserCart(u.email);
-                    return (
-                      <tr key={u._id || u.email} style={idx % 2 ? styles.zebraRow : undefined}>
-                        <td>{u.email}</td>
-                        <td>{u.username}</td>
-                        <td>{u.role}</td>
-                        <td>
-                          {userProducts.length === 0 ? 'None' : (
+                  {users
+                    .filter(u => u.role !== 'admin') // Only non-admin users
+                    .map((u, idx) => {
+                      const userProducts = getUserProducts(u.email);
+                      const userCart = getUserCart(u.email);
+                      return (
+                        <tr key={u._id || u.email} style={idx % 2 ? styles.zebraRow : undefined}>
+                          <td>{u.email}</td>
+                          <td>{u.username}</td>
+                          <td>{u.role}</td>
+                          <td>
+                            {userProducts.length === 0 ? 'None' : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
+                                {userProducts.map(p => (
+                                  <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span>{p.name} (₹{p.price})</span>
+                                    <button style={styles.smallDangerBtn} onClick={() => handleDeleteProduct(p._id)}>Delete</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            {userCart && userCart.items.length > 0 ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
+                                {userCart.items.map((i, iIdx) => (
+                                  <div key={i.productId || iIdx}>
+                                    {i.name} (Qty: {i.quantity}) - ₹{i.price}
+                                  </div>
+                                ))}
+                                <button style={styles.smallDangerBtn} onClick={() => handleDeleteCart(u.email)}>Delete Cart</button>
+                              </div>
+                            ) : 'Empty'}
+                          </td>
+                          <td>
+                            {userCart ? new Date(userCart.lastUpdated).toLocaleString() : 'Never'}
+                          </td>
+                          <td>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
-                              {userProducts.map(p => (
-                                <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                  <span>{p.name} (₹{p.price})</span>
-                                  <button style={styles.smallDangerBtn} onClick={() => handleDeleteProduct(p._id)}>Delete</button>
-                                </div>
-                              ))}
+                              <button style={styles.smallDangerBtn} onClick={() => handleDeleteUser(u.email)}>Delete User</button>
                             </div>
-                          )}
-                        </td>
-                        <td>
-                          {userCart && userCart.items.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
-                              {userCart.items.map((i, iIdx) => (
-                                <div key={i.productId || iIdx}>
-                                  {i.name} (Qty: {i.quantity}) - ₹{i.price}
-                                </div>
-                              ))}
-                              <button style={styles.smallDangerBtn} onClick={() => handleDeleteCart(u.email)}>Delete Cart</button>
-                            </div>
-                          ) : 'Empty'}
-                        </td>
-                        <td>
-                          {userCart ? new Date(userCart.lastUpdated).toLocaleString() : 'Never'}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
-                            <button style={styles.smallDangerBtn} onClick={() => handleDeleteUser(u.email)}>Delete User</button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
