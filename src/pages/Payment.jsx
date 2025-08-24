@@ -3,6 +3,12 @@ import React, { useState, useEffect } from 'react';
 function Payment({ cartItems: propCartItems }) {
   const [paymentMethod, setPaymentMethod] = useState('Credit Card');
   const [totalAmount, setTotalAmount] = useState(0);
+  const [cardDetails, setCardDetails] = useState({
+    cardNumber: '',
+    expiry: '',
+    cvv: '',
+    nameOnCard: ''
+  });
 
   useEffect(() => {
     // Prefer cartItems from props (App state), fallback to localStorage
@@ -19,6 +25,28 @@ function Payment({ cartItems: propCartItems }) {
 
   const handlePaymentMethodChange = (e) => {
     setPaymentMethod(e.target.value);
+    setCardDetails({ cardNumber: '', expiry: '', cvv: '', nameOnCard: '' });
+  };
+
+  const handleCardInput = (e) => {
+    setCardDetails(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if ((paymentMethod === 'Credit Card' || paymentMethod === 'Debit Card')) {
+      if (!cardDetails.cardNumber || !cardDetails.expiry || !cardDetails.cvv || !cardDetails.nameOnCard) {
+        alert('Please fill all card details.');
+        return;
+      }
+      // Optionally, add more validation for card number, expiry, cvv
+      alert(`Payment of ₹${totalAmount.toFixed(2)} via ${paymentMethod} successful!`);
+    } else if (paymentMethod === 'UPI') {
+      alert('Please scan the QR code and pay the exact amount.');
+    } else {
+      alert('Order placed with Cash on Delivery!');
+    }
+    // ...existing code for order placement...
   };
 
   return (
@@ -27,7 +55,7 @@ function Payment({ cartItems: propCartItems }) {
         <h2 style={styles.title}>Checkout</h2>
         <p style={styles.description}>Complete your purchase with secure payment</p>
         
-        <form style={styles.form}>
+        <form style={styles.form} onSubmit={handleSubmit}>
           <div style={styles.formGroup}>
             <label style={styles.label}>Full Name</label>
             <input type="text" placeholder="Enter your full name" style={styles.input} />
@@ -73,6 +101,66 @@ function Payment({ cartItems: propCartItems }) {
               readOnly
             />
           </div>
+
+          {/* Credit Card / Debit Card fields */}
+          {(paymentMethod === 'Credit Card' || paymentMethod === 'Debit Card') && (
+            <div style={styles.cardSection}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Name on Card</label>
+                <input
+                  type="text"
+                  name="nameOnCard"
+                  value={cardDetails.nameOnCard}
+                  onChange={handleCardInput}
+                  style={styles.input}
+                  placeholder="Name as on card"
+                  required
+                />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Card Number</label>
+                <input
+                  type="text"
+                  name="cardNumber"
+                  value={cardDetails.cardNumber}
+                  onChange={handleCardInput}
+                  style={styles.input}
+                  placeholder="Card Number"
+                  maxLength={16}
+                  required
+                />
+              </div>
+              <div style={styles.row}>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Expiry</label>
+                  <input
+                    type="text"
+                    name="expiry"
+                    value={cardDetails.expiry}
+                    onChange={handleCardInput}
+                    style={styles.input}
+                    placeholder="MM/YY"
+                    maxLength={5}
+                    required
+                  />
+                </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>CVV</label>
+                  <input
+                    type="password"
+                    name="cvv"
+                    value={cardDetails.cvv}
+                    onChange={handleCardInput}
+                    style={styles.input}
+                    placeholder="CVV"
+                    maxLength={4}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <button type="submit" className="button" style={styles.button}>Place Order</button>
         </form>
 
@@ -198,6 +286,13 @@ const styles = {
   qrDetails: {
     fontSize: '1.1em',
     color: '#2c3e50'
+  },
+  cardSection: {
+    marginTop: '20px',
+    marginBottom: '20px',
+    background: '#f8f9fa',
+    borderRadius: '12px',
+    padding: '20px'
   }
 };
 
