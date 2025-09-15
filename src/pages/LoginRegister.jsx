@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 function LoginRegister({ onLogin }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     username: '',
@@ -12,6 +14,9 @@ function LoginRegister({ onLogin }) {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Google Client ID from environment variable
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   const handleChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -68,6 +73,34 @@ function LoginRegister({ onLogin }) {
     }
   };
 
+  // Check for user data in URL after Google OAuth redirect
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const userParam = params.get('user');
+    
+    if (userParam) {
+      try {
+        const userData = JSON.parse(decodeURIComponent(userParam));
+        localStorage.setItem('currentUser', JSON.stringify(userData));
+        if (typeof onLogin === 'function') onLogin(userData);
+        navigate('/');
+      } catch (err) {
+        console.error('Error parsing user data from URL', err);
+      }
+    }
+  }, [location, navigate, onLogin]);
+  
+  // Handle Google login success
+  const handleGoogleSuccess = (credentialResponse) => {
+    // Redirect to backend Google auth route
+    window.location.href = 'http://localhost:5000/api/auth/google';
+  };
+  
+  // Handle Google login error
+  const handleGoogleError = () => {
+    setError('Google login failed. Please try again.');
+  };
+  
   return (
     <div style={styles.container}>
       <h2>{isLogin ? 'Login' : 'Register'} as {formData.role}</h2>
@@ -115,11 +148,41 @@ function LoginRegister({ onLogin }) {
           {isLogin ? 'Register here' : 'Login here'}
         </span>
       </p>
+      
+      <div style={styles.divider}>
+        <span>OR</span>
+      </div>
+      
+      <div style={styles.googleContainer}>
+        <GoogleOAuthProvider clientId={googleClientId}>
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            useOneTap
+            theme="filled_blue"
+            text="continue_with"
+            shape="rectangular"
+            logo_alignment="center"
+            width="100%"
+          />
+        </GoogleOAuthProvider>
+      </div>
     </div>
   );
 }
 
 const styles = {
+  divider: {
+    display: 'flex',
+    alignItems: 'center',
+    margin: '20px 0',
+    color: '#666',
+    textAlign: 'center',
+  },
+  googleContainer: {
+    width: '100%',
+    marginTop: '10px',
+  },
   container: {
     padding: '40px 30px',
     textAlign: 'center',

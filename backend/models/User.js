@@ -4,7 +4,10 @@ const userSchema = new mongoose.Schema({
   username: String,
   email: { type: String, unique: true },
   password: String,
-  role: { type: String, enum: ['buyer', 'seller', 'admin'] }
+  role: { type: String, enum: ['buyer', 'seller', 'admin'] },
+  googleId: String,
+  displayName: String,
+  profilePicture: String
 }, {
   timestamps: true // Adds createdAt and updatedAt fields
 });

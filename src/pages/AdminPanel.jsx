@@ -455,7 +455,7 @@ function AdminPanel() {
                           <span style={{
                             ...styles.activityBadge,
                             backgroundColor: 
-                              activity.type === 'product_added' ? '#e3f2fd' : 
+                              activity.type === 'product_added' ? '#439fe1ff' : 
                               activity.type === 'cart_updated' ? '#fff3e0' : 
                               '#e8f5e9',
                             color: 
@@ -497,7 +497,7 @@ const styles = {
   heading: {
     fontSize: '2.4em',
     fontWeight: '700',
-    color: '#2c3e50',
+    color: '#2b7106ff',
     margin: 0
   },
   headerActions: {
