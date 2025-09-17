@@ -2,72 +2,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const passport = require('passport');
-const session = require('express-session');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const User = require('./models/User');
 require('dotenv').config();
 
 const app = express();
 app.use(cors({ origin: true, credentials: true, allowedHeaders: ['Content-Type', 'x-admin-key'] }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-// Configure session
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your_session_secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production' }
-}));
-
-// Initialize Passport
-app.use(passport.initialize());
-app.use(passport.session());
-
-// Passport serialization
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
-
-passport.deserializeUser(async (id, done) => {
-  try {
-    const user = await User.findById(id);
-    done(null, user);
-  } catch (err) {
-    done(err, null);
-  }
-});
-
-// Configure Google Strategy
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID || 'your-client-id',
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'your-client-secret',
-  callbackURL: '/api/auth/google/callback',
-  scope: ['profile', 'email']
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    // Check if user already exists
-    let user = await User.findOne({ googleId: profile.id });
-    
-    if (!user) {
-      // Create new user if doesn't exist
-      user = await User.create({
-        googleId: profile.id,
-        displayName: profile.displayName,
-        username: profile.displayName,
-        email: profile.emails[0].value,
-        profilePicture: profile.photos[0].value,
-        role: 'buyer' // Default role
-      });
-    }
-    
-    return done(null, user);
-  } catch (err) {
-    return done(err, null);
-  }
-}));
-
 
 // MongoDB connection with fallback and better error handling
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/handmade_crafts';

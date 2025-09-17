@@ -149,10 +149,10 @@ function App() {
 const styles = {
   header: {
     textAlign: 'center',
-    background: 'linear-gradient(135deg, #f5f074ff 0%, #e79a15ff 100%)',
+    background: 'linear-gradient(135deg, #e8d47bff 0%, #edb60eff 100%)',
     color: 'white',
     padding: '30px 0',
-    boxShadow: '0 4px 20px rgba(208, 29, 29, 0.1)'
+    boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
   },
   navbar: {
     display: 'flex',
@@ -160,7 +160,7 @@ const styles = {
     alignItems: 'center',
     flexWrap: 'wrap',
     padding: '15px 20px',
-    background: 'rgba(142, 208, 211, 0.95)',
+    background: 'rgba(20, 160, 230, 0.95)',
     backdropFilter: 'blur(10px)',
     borderBottom: '1px solid rgba(0,0,0,0.1)',
     position: 'sticky',

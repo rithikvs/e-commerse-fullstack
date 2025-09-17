@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const passport = require('passport');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 
@@ -69,45 +68,6 @@ router.get('/admins', async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
-});
-
-// Google OAuth Routes
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-
-router.get('/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => {
-    // Successful authentication
-    const user = req.user;
-    // Create a user object to send to the client
-    const userForClient = {
-      _id: user._id,
-      username: user.username || user.displayName,
-      email: user.email,
-      role: user.role,
-      profilePicture: user.profilePicture
-    };
-    
-    // Redirect to frontend with user data
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}?user=${encodeURIComponent(JSON.stringify(userForClient))}`);
-  }
-);
-
-// Check if user is authenticated
-router.get('/current-user', (req, res) => {
-  if (req.isAuthenticated()) {
-    res.json(req.user);
-  } else {
-    res.status(401).json({ message: 'Not authenticated' });
-  }
-});
-
-// Logout route
-router.get('/logout', (req, res) => {
-  req.logout((err) => {
-    if (err) return res.status(500).json({ message: err.message });
-    res.json({ message: 'Logged out successfully' });
-  });
 });
 
 module.exports = router;
