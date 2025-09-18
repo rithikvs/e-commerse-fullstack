@@ -79,7 +79,7 @@ function Sell({ user }) {
 
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
-    window.location.reload();
+    navigate('/login'); // Change from window.location.reload()
   };
 
   return (

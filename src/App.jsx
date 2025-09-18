@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import Home from './pages/Home';
 import About from './pages/About';
 import Contact from './pages/Contact';
@@ -10,7 +10,9 @@ import Sell from './pages/Sell';
 import AdminPanel from './pages/AdminPanel';
 import AdminLogin from './pages/AdminLogin';
 
-function App() {
+// Create a separate component for the app content
+function AppContent() {
+  const navigate = useNavigate();
   const [cartItems, setCartItems] = useState([]);
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('currentUser')) || null);
 
@@ -91,6 +93,7 @@ function App() {
     setUser(null);
     localStorage.removeItem('currentUser');
     setCartItems([]);
+    navigate('/login');
   };
 
   // Save cart to localStorage whenever cartItems changes
@@ -98,50 +101,93 @@ function App() {
     localStorage.setItem('cartItems', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  return (
-    <Router>
-      <div>
-        {/* Header */}
-        <header style={styles.header}>
-          <h1>Handmade Crafts</h1>
-        </header>
+  // Check if user is authenticated and is admin
+  const isAdmin = user?.isAdmin && user?.adminKey;
+  const isAuthenticated = !!user;
 
-        {/* Navbar */}
-        <nav style={styles.navbar} className="navbar">
-          <Link to="/" className="nav-link" style={styles.navLink}>Home</Link>
-          <Link to="/about" className="nav-link" style={styles.navLink}>About</Link>
-          <Link to="/contact" className="nav-link" style={styles.navLink}>Contact</Link>
-          <Link to="/cart" className="nav-link" style={styles.navLink}>Cart ({cartItems.length})</Link>
-          <Link to="/sell" className="nav-link" style={styles.navLink}>Sell</Link>
-          <Link to="/admin" className="nav-link" style={styles.navLink}>Admin</Link>
-          {user ? (
-            <>
+  // Protected route component
+  const ProtectedRoute = ({ children, adminRequired = false }) => {
+    if (!isAuthenticated) {
+      return <Navigate to="/login" replace />;
+    }
+    if (adminRequired && !isAdmin) {
+      return <Navigate to="/" replace />;
+    }
+    return children;
+  };
+
+  return (
+    <div>
+      {/* Header and Navigation */}
+      {isAuthenticated && (
+        <>
+          <header style={styles.header}>
+            <h1>Handmade Crafts</h1>
+          </header>
+          
+          {!isAdmin ? (
+            <nav style={styles.navbar}>
+              <Link to="/" className="nav-link" style={styles.navLink}>Home</Link>
+              <Link to="/about" className="nav-link" style={styles.navLink}>About</Link>
+              <Link to="/contact" className="nav-link" style={styles.navLink}>Contact</Link>
+              <Link to="/cart" className="nav-link" style={styles.navLink}>Cart ({cartItems.length})</Link>
+              <Link to="/sell" className="nav-link" style={styles.navLink}>Sell</Link>
               <span className="nav-link" style={styles.navLink}>Welcome, {user.username}</span>
               <span className="nav-link" style={styles.navLink} onClick={handleLogout}>Logout</span>
-            </>
+            </nav>
           ) : (
-            <Link to="/login" className="nav-link" style={styles.navLink}>Login</Link>
+            <nav style={styles.navbar}>
+              <Link to="/admin" className="nav-link" style={styles.navLink}>Admin Panel</Link>
+              <span className="nav-link" style={styles.navLink}>Admin: {user.username}</span>
+              <span className="nav-link" style={styles.navLink} onClick={handleLogout}>Logout</span>
+            </nav>
           )}
-        </nav>
+        </>
+      )}
 
-        {/* Routes */}
-        <Routes>
-          <Route path="/" element={<Home addToCart={addToCart} user={user} />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/cart" element={<Cart cartItems={cartItems} removeFromCart={removeFromCart} />} />
-          <Route path="/payment" element={<Payment cartItems={cartItems} />} />
-          <Route path="/sell" element={<Sell user={user} />} />
-          <Route path="/login" element={<LoginRegister onLogin={handleLogin} />} />
-          <Route path="/admin" element={<AdminPanel />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-        </Routes>
+      {/* Routes */}
+      <Routes>
+        <Route path="/login" element={
+          isAuthenticated ? 
+            (isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/" replace />) 
+            : <LoginRegister onLogin={handleLogin} />
+        } />
+        
+        {/* Admin routes */}
+        {isAdmin ? (
+          <>
+            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </>
+        ) : (
+          // Regular user routes
+          <>
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Home addToCart={addToCart} user={user} />
+              </ProtectedRoute>
+            } />
+            <Route path="/cart" element={
+              <ProtectedRoute>
+                <Cart cartItems={cartItems} removeFromCart={removeFromCart} />
+              </ProtectedRoute>
+            } />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/payment" element={<Payment cartItems={cartItems} />} />
+            <Route path="/sell" element={<Sell user={user} />} />
+          </>
+        )}
+      </Routes>
+    </div>
+  );
+}
 
-        {/* Footer */}
-        <footer style={styles.footer}>
-          <p>&copy; 2025 Handmade Crafts. All rights reserved.</p>
-        </footer>
-      </div>
+// Main App component
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }

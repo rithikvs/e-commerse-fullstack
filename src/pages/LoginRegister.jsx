@@ -7,11 +7,11 @@ function LoginRegister({ onLogin }) {
   const [formData, setFormData] = useState({
     username: '',
     email: '',
-    password: '',
-    role: 'buyer'
+    password: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [userType, setUserType] = useState('user'); // 'user' or 'admin'
 
   const handleChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -50,17 +50,34 @@ function LoginRegister({ onLogin }) {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const endpoint = userType === 'admin' 
+        ? 'http://localhost:5000/api/auth/admin/login'
+        : 'http://localhost:5000/api/auth/login';
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, password: formData.password, role: formData.role })
+        body: JSON.stringify({ 
+          email: formData.email, 
+          password: formData.password 
+        })
       });
+
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data?.message || 'Invalid credentials');
-      // Persist and update app state
-      localStorage.setItem('currentUser', JSON.stringify(data));
-      if (typeof onLogin === 'function') onLogin(data);
-      navigate('/');
+
+      // Store user/admin data
+      const userData = {
+        ...data,
+        isAdmin: userType === 'admin',
+        adminKey: data.adminKey
+      };
+      
+      localStorage.setItem('currentUser', JSON.stringify(userData));
+      if (typeof onLogin === 'function') onLogin(userData);
+      
+      // Redirect admins to admin panel, regular users to home
+      navigate(userType === 'admin' ? '/admin' : '/');
     } catch (err) {
       setError(err.message || 'Login failed');
     } finally {
@@ -70,9 +87,36 @@ function LoginRegister({ onLogin }) {
 
   return (
     <div style={styles.container}>
-      <h2>{isLogin ? 'Login' : 'Register'} as {formData.role}</h2>
+      <h2>{isLogin ? 'Login' : 'Register'}</h2>
       {error && <div style={styles.error}>{error}</div>}
+      
       <form style={styles.form} onSubmit={isLogin ? handleLogin : handleRegister}>
+        {/* Login Type Selection */}
+        {isLogin && (
+          <div style={styles.loginTypeContainer}>
+            <button
+              type="button"
+              style={{
+                ...styles.loginTypeBtn,
+                ...(userType === 'user' ? styles.activeLoginType : {})
+              }}
+              onClick={() => setUserType('user')}
+            >
+              User Login
+            </button>
+            <button
+              type="button"
+              style={{
+                ...styles.loginTypeBtn,
+                ...(userType === 'admin' ? styles.activeLoginType : {})
+              }}
+              onClick={() => setUserType('admin')}
+            >
+              Admin Login
+            </button>
+          </div>
+        )}
+
         {!isLogin && (
           <input
             name="username"
@@ -101,10 +145,6 @@ function LoginRegister({ onLogin }) {
           onChange={handleChange}
           required
         />
-        <select name="role" value={formData.role} onChange={handleChange} style={styles.input}>
-          <option value="buyer">Buyer</option>
-          <option value="seller">Seller</option>
-        </select>
         <button type="submit" className="button" style={styles.button} disabled={loading}>
           {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Register')}
         </button>
@@ -173,6 +213,26 @@ const styles = {
     borderRadius: '8px',
     marginBottom: '14px',
     display: 'inline-block'
+  },
+  loginTypeContainer: {
+    display: 'flex',
+    gap: '10px',
+    marginBottom: '20px',
+    justifyContent: 'center'
+  },
+  loginTypeBtn: {
+    padding: '10px 20px',
+    borderRadius: '20px',
+    border: '2px solid #3498db',
+    background: 'transparent',
+    color: '#3498db',
+    cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'all 0.3s'
+  },
+  activeLoginType: {
+    background: '#3498db',
+    color: 'white'
   }
 };
 

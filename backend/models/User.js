@@ -3,10 +3,9 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   username: String,
   email: { type: String, unique: true },
-  password: String,
-  role: { type: String, enum: ['buyer', 'seller', 'admin'] }
+  password: String
 }, {
-  timestamps: true // Adds createdAt and updatedAt fields
+  timestamps: true
 });
 
 module.exports = mongoose.model('User', userSchema);

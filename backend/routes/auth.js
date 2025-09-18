@@ -3,26 +3,31 @@ const router = express.Router();
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 
-// Register user (save to DB)
-router.post('/register', async (req, res) => {
+// Admin login using database credentials
+const ADMIN_KEY = process.env.ADMIN_KEY || 'local-admin-key';
+router.post('/admin/login', async (req, res) => {
   try {
-    const exists = await User.findOne({ email: req.body.email });
-    if (exists) return res.status(400).json({ message: 'User exists' });
-
-    const user = new User({
-      username: req.body.username,
-      email: req.body.email,
-      password: req.body.password,
-      role: req.body.role
+    const { email, password } = req.body;
+    // Find admin in database
+    const admin = await Admin.findOne({ email });
+    
+    if (!admin || admin.password !== password) {
+      return res.status(401).json({ message: 'Invalid admin credentials' });
+    }
+    
+    res.json({ 
+      email: admin.email,
+      username: admin.username,
+      role: 'admin',
+      adminKey: ADMIN_KEY,
+      _id: admin._id
     });
-    await user.save();
-    res.json({ message: 'Registered', user });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Login user (check DB)
+// User login (simplified - no roles)
 router.post('/login', async (req, res) => {
   try {
     const user = await User.findOne({
@@ -31,20 +36,29 @@ router.post('/login', async (req, res) => {
     });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
-    res.json(user);
+    res.json({
+      email: user.email,
+      username: user.username,
+      _id: user._id
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Admin login returns adminKey (simple static for demo)
-const ADMIN_KEY = process.env.ADMIN_KEY || 'local-admin-key';
-router.post('/admin/login', async (req, res) => {
+// Register user (no role needed)
+router.post('/register', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const admin = await Admin.findOne({ email, password });
-    if (!admin) return res.status(401).json({ message: 'Unauthorized' });
-    res.json({ adminKey: ADMIN_KEY, admin });
+    const exists = await User.findOne({ email: req.body.email });
+    if (exists) return res.status(400).json({ message: 'User exists' });
+
+    const user = new User({
+      username: req.body.username,
+      email: req.body.email,
+      password: req.body.password
+    });
+    await user.save();
+    res.json({ message: 'Registered', user });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
