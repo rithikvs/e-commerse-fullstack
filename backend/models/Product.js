@@ -51,6 +51,11 @@ const productSchema = new mongoose.Schema({
     type: Number,
     default: 10,
     min: [0, 'Stock cannot be negative']
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
   }
 }, {
   timestamps: true // Adds createdAt and updatedAt fields

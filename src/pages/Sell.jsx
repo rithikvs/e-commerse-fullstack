@@ -55,39 +55,24 @@ function Sell({ user }) {
         owner: user?.email || 'guest',
         description: formData.description,
         category: 'Handmade',
-        inStock: true
+        inStock: true,
+        status: 'pending' // Mark as pending for admin approval
       };
-      let savedToDB = false;
+
       try {
         const response = await fetch('http://localhost:5000/api/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newProduct)
         });
-        const result = await response.json();
-        if (!response.ok) {
-          if (result.errors && Array.isArray(result.errors)) {
-            alert(result.errors.join('\n'));
-          } else {
-            alert(result.message || 'Failed to save product to MongoDB');
-          }
-          console.error('Backend error:', result);
-        } else {
-          savedToDB = true;
-        }
+        if (!response.ok) throw new Error('Failed to submit product');
+        alert('Product submitted successfully! Waiting for admin approval.');
+        setFormData({ name: '', price: '', material: '', rating: '', stock: 10, image: null, description: '' });
+        setPreview(null);
+        navigate('/');
       } catch (err) {
-        alert('Error saving product to database. Saving locally instead.');
-        console.error('Network error:', err);
+        alert('Error submitting product. Please try again.');
       }
-      if (!savedToDB) {
-        // Save to localStorage for Home page fallback
-        const homeProducts = JSON.parse(localStorage.getItem('homeProducts')) || [];
-        localStorage.setItem('homeProducts', JSON.stringify([...homeProducts, { ...newProduct, id: Date.now() }]));
-      }
-      window.alert('Product added successfully! Go to Home page to view your product.');
-      setFormData({ name: '', price: '', material: '', rating: '', stock: 10, image: null, description: '' });
-      setPreview(null);
-      navigate('/');
     };
     reader.readAsDataURL(formData.image);
   };
@@ -186,4 +171,3 @@ const styles = {
 };
 
 export default Sell;
-

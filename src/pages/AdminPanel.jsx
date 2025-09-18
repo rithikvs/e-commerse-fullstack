@@ -216,6 +216,40 @@ function AdminPanel() {
 
   const totalCartItems = carts.reduce((sum, c) => sum + (c.totalItems || (c.items?.length || 0)), 0);
 
+  const handleApproveProduct = async (productId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/products/${productId}/approve`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey
+        }
+      });
+      if (!response.ok) throw new Error('Failed to approve product');
+      fetchAll();
+      alert('Product approved successfully!');
+    } catch (err) {
+      alert('Error approving product');
+    }
+  };
+
+  const handleRejectProduct = async (productId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/products/${productId}/reject`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey
+        }
+      });
+      if (!response.ok) throw new Error('Failed to reject product');
+      fetchAll();
+      alert('Product rejected');
+    } catch (err) {
+      alert('Error rejecting product');
+    }
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.headerRow}>
@@ -339,6 +373,51 @@ function AdminPanel() {
                         </tr>
                       );
                     })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section style={styles.section}>
+            <h3 style={styles.sectionTitle}>Pending Products</h3>
+            <div style={styles.tableWrap}>
+              <table style={styles.table}>
+                <thead style={styles.theadSticky}>
+                  <tr>
+                    <th>Name</th>
+                    <th>Seller</th>
+                    <th>Price</th>
+                    <th>Material</th>
+                    <th>Stock</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products
+                    .filter(p => p.status === 'pending')
+                    .map((product, idx) => (
+                      <tr key={product._id} style={idx % 2 ? styles.zebraRow : undefined}>
+                        <td>{product.name}</td>
+                        <td>{product.owner}</td>
+                        <td>₹{product.price}</td>
+                        <td>{product.material}</td>
+                        <td>{product.stock}</td>
+                        <td style={{ display: 'flex', gap: '10px' }}>
+                          <button 
+                            style={styles.approveBtn} 
+                            onClick={() => handleApproveProduct(product._id)}
+                          >
+                            Approve
+                          </button>
+                          <button 
+                            style={styles.rejectBtn} 
+                            onClick={() => handleRejectProduct(product._id)}
+                          >
+                            Reject
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -617,6 +696,24 @@ const styles = {
     padding:'6px 8px',
     border:'1px solid #e1e5ea',
     borderRadius:6
+  },
+  approveBtn: {
+    backgroundColor: '#27ae60',
+    color: 'white',
+    border: 'none',
+    padding: '6px 12px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600'
+  },
+  rejectBtn: {
+    backgroundColor: '#e74c3c',
+    color: 'white',
+    border: 'none',
+    padding: '6px 12px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600'
   }
 };
 

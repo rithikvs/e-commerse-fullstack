@@ -55,11 +55,13 @@ function Home({ addToCart }) {
       try {
         const res = await fetch('http://localhost:5000/api/products');
         const dbProducts = await res.json();
+        // Only show approved products
+        const approvedProducts = dbProducts.filter(p => p.status === 'approved');
         const homeProducts = JSON.parse(localStorage.getItem('homeProducts')) || [];
         // Prefer DB products; only include local home products that aren't already in DB
-        const filteredHome = homeProducts.filter(lp => !dbProducts.some(dp => dp.name === lp.name && (dp.owner || '') === (lp.owner || '') ));
+        const filteredHome = homeProducts.filter(lp => !approvedProducts.some(dp => dp.name === lp.name && (dp.owner || '') === (lp.owner || '') ));
         // Combine, but do NOT include staticProducts to avoid duplicates when seeded
-        const combined = [...dbProducts, ...filteredHome];
+        const combined = [...approvedProducts, ...filteredHome];
         // Unique by name+owner
         const unique = [];
         const seen = new Set();

@@ -139,4 +139,40 @@ router.get('/owner/:email', async (req, res) => {
   }
 });
 
+// Admin: Approve product
+router.put('/:id/approve', async (req, res) => {
+  try {
+    const key = req.headers['x-admin-key'];
+    if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
+    
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { status: 'approved' },
+      { new: true }
+    );
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    res.json({ message: 'Product approved', product });
+  } catch (error) {
+    res.status(500).json({ message: 'Error approving product', error: error.message });
+  }
+});
+
+// Admin: Reject product
+router.put('/:id/reject', async (req, res) => {
+  try {
+    const key = req.headers['x-admin-key'];
+    if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
+    
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { status: 'rejected' },
+      { new: true }
+    );
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    res.json({ message: 'Product rejected', product });
+  } catch (error) {
+    res.status(500).json({ message: 'Error rejecting product', error: error.message });
+  }
+});
+
 module.exports = router;
