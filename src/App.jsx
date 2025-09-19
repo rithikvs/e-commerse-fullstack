@@ -116,6 +116,17 @@ function AppContent() {
     return children;
   };
 
+  // Protected admin route component
+  const ProtectedAdminRoute = ({ children }) => {
+    const user = JSON.parse(localStorage.getItem('currentUser'));
+    const isAdmin = user?.isAdmin && user?.adminKey;
+    
+    if (!isAdmin) {
+      return <Navigate to="/login" replace />;
+    }
+    return children;
+  };
+
   return (
     <div>
       {/* Header and Navigation */}
@@ -154,30 +165,29 @@ function AppContent() {
         } />
         
         {/* Admin routes */}
-        {isAdmin ? (
-          <>
-            <Route path="/admin" element={<AdminPanel />} />
-            <Route path="*" element={<Navigate to="/admin" replace />} />
-          </>
-        ) : (
-          // Regular user routes
-          <>
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Home addToCart={addToCart} user={user} />
-              </ProtectedRoute>
-            } />
-            <Route path="/cart" element={
-              <ProtectedRoute>
-                <Cart cartItems={cartItems} removeFromCart={removeFromCart} />
-              </ProtectedRoute>
-            } />
-            <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/payment" element={<Payment cartItems={cartItems} />} />
-            <Route path="/sell" element={<Sell user={user} />} />
-          </>
-        )}
+        <Route path="/admin" element={
+          <ProtectedAdminRoute>
+            <AdminPanel />
+          </ProtectedAdminRoute>
+        } />
+        
+        {/* Regular user routes */}
+        <Route path="/" element={
+          <ProtectedRoute>
+            <Home addToCart={addToCart} user={user} />
+          </ProtectedRoute>
+        } />
+        <Route path="/cart" element={
+          <ProtectedRoute>
+            <Cart cartItems={cartItems} removeFromCart={removeFromCart} />
+          </ProtectedRoute>
+        } />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/payment" element={<Payment cartItems={cartItems} />} />
+        <Route path="/sell" element={<Sell user={user} />} />
+        
+        <Route path="*" element={<Navigate to={isAdmin ? "/admin" : "/"} replace />} />
       </Routes>
     </div>
   );

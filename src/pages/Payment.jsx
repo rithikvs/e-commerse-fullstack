@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function Payment({ cartItems: propCartItems }) {
+  const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState('Credit Card');
   const [totalAmount, setTotalAmount] = useState(0);
   const [cardDetails, setCardDetails] = useState({
@@ -9,6 +11,8 @@ function Payment({ cartItems: propCartItems }) {
     cvv: '',
     nameOnCard: ''
   });
+  const [orderProcessing, setOrderProcessing] = useState(false);
+  const user = JSON.parse(localStorage.getItem('currentUser'));
 
   useEffect(() => {
     // Prefer cartItems from props (App state), fallback to localStorage
@@ -32,21 +36,95 @@ function Payment({ cartItems: propCartItems }) {
     setCardDetails(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if ((paymentMethod === 'Credit Card' || paymentMethod === 'Debit Card')) {
-      if (!cardDetails.cardNumber || !cardDetails.expiry || !cardDetails.cvv || !cardDetails.nameOnCard) {
-        alert('Please fill all card details.');
-        return;
+  const processOrder = async () => {
+    setOrderProcessing(true);
+    try {
+      // Validate form fields
+      const formValues = {
+        fullName: document.querySelector('input[placeholder="Enter your full name"]').value,
+        email: document.querySelector('input[placeholder="Enter your email"]').value,
+        address: document.querySelector('input[placeholder="Enter your address"]').value,
+        city: document.querySelector('input[placeholder="Enter city"]').value,
+        postalCode: document.querySelector('input[placeholder="Enter postal code"]').value
+      };
+
+      if (!formValues.fullName || !formValues.email || !formValues.address || !formValues.city || !formValues.postalCode) {
+        throw new Error('Please fill all shipping details');
       }
-      // Optionally, add more validation for card number, expiry, cvv
-      alert(`Payment of ₹${totalAmount.toFixed(2)} via ${paymentMethod} successful!`);
-    } else if (paymentMethod === 'UPI') {
-      alert('Please scan the QR code and pay the exact amount.');
-    } else {
-      alert('Order placed with Cash on Delivery!');
+
+      // Process each item in cart
+      for (const item of propCartItems) {
+        const productId = item._id || item.productId;
+        if (!productId) continue;
+
+        try {
+          const response = await fetch(`http://localhost:5000/api/products/${productId}/stock`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              reduceBy: item.quantity || 1
+            })
+          });
+
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.message || 'Failed to update stock');
+          }
+        } catch (error) {
+          throw new Error(`Failed to process item: ${item.name}`);
+        }
+      }
+
+      // Clear user's cart
+      if (user?.email) {
+        await fetch(`http://localhost:5000/api/cart/${user.email}`, {
+          method: 'DELETE'
+        });
+      }
+
+      // Show success message with order details
+      const orderDetails = `
+✅ Order Placed Successfully!
+
+📦 Order Details:
+----------------
+${propCartItems.map(item => 
+  `• ${item.name}
+   Quantity: ${item.quantity || 1}
+   Price: ₹${String(item.price).replace(/[^0-9]/g, '')}`
+).join('\n\n')}
+
+💰 Total Amount: ₹${totalAmount.toFixed(2)}
+💳 Payment Method: ${paymentMethod}
+
+🚚 Shipping Details:
+----------------
+Name: ${formValues.fullName}
+Address: ${formValues.address}
+City: ${formValues.city}
+PIN: ${formValues.postalCode}
+
+Thank you for shopping with us! 🎉
+`;
+
+      alert(orderDetails);
+      localStorage.removeItem('cartItems');
+      navigate('/');
+
+    } catch (err) {
+      alert(err.message || 'Error processing payment');
+    } finally {
+      setOrderProcessing(false);
     }
-    // ...existing code for order placement...
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await processOrder();
+    } catch (err) {
+      console.error('Order processing error:', err);
+    }
   };
 
   return (
@@ -161,7 +239,14 @@ function Payment({ cartItems: propCartItems }) {
             </div>
           )}
 
-          <button type="submit" className="button" style={styles.button}>Place Order</button>
+          <button 
+            type="submit" 
+            className="button" 
+            style={{...styles.button, opacity: orderProcessing ? 0.7 : 1}} 
+            disabled={orderProcessing}
+          >
+            {orderProcessing ? 'Processing...' : 'Place Order'}
+          </button>
         </form>
 
         {/* Show QR code if UPI is selected */}

@@ -1,220 +1,164 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-async function safeJsonFetch(url, options = {}) {
-  const res = await fetch(url, options);
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
-    return {};
-  }
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
-  return data;
-}
-
 function AdminPanel() {
-  const [users, setUsers] = useState([]);
-  const [admins, setAdmins] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [carts, setCarts] = useState([]);
-  const [activities, setActivities] = useState([]);
+  const [state, setState] = useState({
+    users: [],
+    admins: [],
+    products: [],
+    carts: [],
+    activities: []
+  });
   const [loading, setLoading] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState(null);
   const [stockUpdates, setStockUpdates] = useState({});
   const navigate = useNavigate();
-  const timerRef = useRef(null);
 
-  const adminKey = localStorage.getItem('adminKey');
+  const adminKey = JSON.parse(localStorage.getItem('currentUser'))?.adminKey;
 
   useEffect(() => {
     if (!adminKey) {
-      navigate('/admin/login');
+      navigate('/login');
+      return;
     }
-  }, [adminKey, navigate]);
-
-  const authHeaders = {
-    'x-admin-key': adminKey || ''
-  };
-
-  const fetchAll = async () => {
-    if (!adminKey) return;
-    setLoading(true);
-    try {
-      const [usersData, productsData, cartsData, adminsData] = await Promise.all([
-        safeJsonFetch('http://localhost:5000/api/users/all', { headers: authHeaders }),
-        safeJsonFetch('http://localhost:5000/api/products', { headers: authHeaders }),
-        safeJsonFetch('http://localhost:5000/api/cart/all', { headers: authHeaders }),
-        safeJsonFetch('http://localhost:5000/api/auth/admins', { headers: authHeaders }),
-      ]);
-
-      const usersArr = Array.isArray(usersData) ? usersData : [];
-      const productsArr = Array.isArray(productsData) ? productsData : [];
-      const cartsArr = Array.isArray(cartsData) ? cartsData : [];
-      const adminsArr = Array.isArray(adminsData) ? adminsData : [];
-
-      setUsers(usersArr);
-      setAdmins(adminsArr);
-      setProducts(productsArr);
-      setCarts(cartsArr);
-
-      // Initialize stock form values from latest products
-      const initialStocks = {};
-      for (const p of productsArr) {
-        initialStocks[p._id] = typeof p.stock === 'number' ? p.stock : 0;
-      }
-      setStockUpdates(initialStocks);
-
-      let allActivities = [];
-      if (productsArr.length > 0) {
-        allActivities = allActivities.concat(productsArr.map(p => ({
-          type: 'product_added',
-          timestamp: p.createdAt || new Date().toISOString(),
-          email: p.owner || 'unknown',
-          details: `Added product: ${p.name} (₹${p.price})`,
-          data: p
-        })));
-      }
-      if (cartsArr.length > 0) {
-        allActivities = allActivities.concat(cartsArr.map(c => ({
-          type: 'cart_updated',
-          timestamp: c.lastUpdated || c.updatedAt || new Date().toISOString(),
-          email: c.userEmail || 'unknown',
-          details: `Updated cart with ${c.totalItems || c.items?.length || 0} items`,
-          data: c
-        })));
-      }
-      // Separate admin users from regular users in activity logs
-      const adminEmails = adminsArr.map(admin => admin.email);
-      if (usersArr.length > 0) {
-        allActivities = allActivities.concat(usersArr.map(u => ({
-          type: 'user_registered',
-          timestamp: u.createdAt || new Date().toISOString(),
-          email: u.email || 'unknown',
-          details: `User registered as ${adminEmails.includes(u.email) ? 'admin' : (u.role || 'buyer')}`,
-          data: u
-        })));
-      }
-      allActivities.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-      setActivities(allActivities);
-      setLastUpdated(new Date());
-    } catch (err) {
-      console.error('AdminPanel fetch error details:', err);
-      setUsers([]);
-      setAdmins([]);
-      setProducts([]);
-      setCarts([]);
-      setActivities([]);
-      if (String(err.message).toLowerCase().includes('unauthorized')) {
-        localStorage.removeItem('adminKey');
-        navigate('/admin/login');
-      }
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchAll();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadAdminData();
   }, [adminKey]);
 
-  useEffect(() => {
-    if (autoRefresh) {
-      timerRef.current = setInterval(fetchAll, 5000);
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+  const loadAdminData = async () => {
+    setLoading(true);
+    try {
+      const headers = { 'x-admin-key': adminKey };
+      const [users, products, carts, admins] = await Promise.all([
+        fetch('http://localhost:5000/api/auth/all', { headers }).then(r => r.json()),
+        fetch('http://localhost:5000/api/products', { headers }).then(r => r.json()),
+        fetch('http://localhost:5000/api/cart/all', { headers }).then(r => r.json()),
+        fetch('http://localhost:5000/api/auth/admins', { headers }).then(r => r.json())
+      ]);
+
+      // Generate activities from data
+      let activities = [];
+
+      // Product activities
+      products?.forEach(p => {
+        activities.push({
+          timestamp: p.createdAt,
+          email: p.owner,
+          type: 'product_added',
+          details: `Added product: ${p.name} (₹${p.price})`
+        });
+      });
+
+      // Cart activities
+      carts?.forEach(c => {
+        activities.push({
+          timestamp: c.updatedAt || c.lastUpdated,
+          email: c.userEmail,
+          type: 'cart_updated',
+          details: `Cart updated: ${c.items?.length || 0} items`
+        });
+      });
+
+      // Sort activities by timestamp
+      activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      setState({
+        users: users || [],
+        admins: admins || [],
+        products: products || [],
+        carts: carts || [],
+        activities: activities
+      });
+
+      // Initialize stock values
+      const stocks = {};
+      products?.forEach(p => {
+        stocks[p._id] = p.stock || 0;
+      });
+      setStockUpdates(stocks);
+
+    } catch (error) {
+      console.error('Admin data load error:', error);
+      if (error.message.includes('unauthorized')) {
+        navigate('/login');
+      }
+    } finally {
+      setLoading(false);
     }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [autoRefresh]);
+  };
 
   const handleLogout = () => {
-    localStorage.removeItem('adminKey');
-    navigate('/admin/login');
-  };
-
-  const handleStockChange = (id, value) => {
-    setStockUpdates(prev => ({ ...prev, [id]: value }));
-  };
-
-  const saveStock = async (id) => {
-    const val = Number(stockUpdates[id]);
-    if (Number.isNaN(val) || val < 0) {
-      alert('Enter a valid non-negative number');
-      return;
-    }
-    await safeJsonFetch(`http://localhost:5000/api/products/${id}/admin/stock`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey || '' },
-      body: JSON.stringify({ stock: val })
-    });
-    const next = { ...stockUpdates };
-    delete next[id];
-    setStockUpdates(next);
-    fetchAll();
-  };
-
-  const saveAllStocks = async () => {
-    const requests = [];
-    for (const p of products) {
-      const val = Number(stockUpdates[p._id]);
-      if (Number.isNaN(val) || val < 0) {
-        alert(`Invalid stock for ${p.name}`);
-        return;
-      }
-      // Only send if changed
-      if (val !== (typeof p.stock === 'number' ? p.stock : 0)) {
-        requests.push(
-          safeJsonFetch(`http://localhost:5000/api/products/${p._id}/admin/stock`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey || '' },
-            body: JSON.stringify({ stock: val })
-          })
-        );
-      }
-    }
-    if (requests.length === 0) {
-      alert('No stock changes to save');
-      return;
-    }
-    await Promise.all(requests);
-    fetchAll();
-    alert('All stock changes saved');
+    localStorage.removeItem('currentUser');
+    navigate('/login');
   };
 
   const handleDeleteUser = async (email) => {
-    if (!window.confirm(`Delete user ${email}?`)) return;
-    await safeJsonFetch(`http://localhost:5000/api/users/${email}`, { method: 'DELETE', headers: authHeaders });
-    fetchAll();
+    try {
+      const response = await fetch(`http://localhost:5000/api/auth/users/${email}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-key': adminKey }
+      });
+      if (!response.ok) throw new Error('Failed to delete user');
+      loadAdminData(); // Refresh data
+      alert('User deleted successfully');
+    } catch (error) {
+      alert('Error deleting user: ' + error.message);
+    }
   };
 
-  const handleDeleteProduct = async (id) => {
-    if (!window.confirm(`Delete product ${id}?`)) return;
-    await safeJsonFetch(`http://localhost:5000/api/products/${id}/admin`, { method: 'DELETE', headers: authHeaders });
-    fetchAll();
+  const handleDeleteProduct = async (productId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/products/${productId}/admin`, {
+        method: 'DELETE',
+        headers: { 'x-admin-key': adminKey }
+      });
+      if (!response.ok) throw new Error('Failed to delete product');
+      loadAdminData(); // Refresh data
+      alert('Product deleted successfully');
+    } catch (error) {
+      alert('Error deleting product: ' + error.message);
+    }
   };
 
-  const handleDeleteCart = async (email) => {
-    if (!window.confirm(`Delete cart for ${email}?`)) return;
-    await safeJsonFetch(`http://localhost:5000/api/cart/${email}`, { method: 'DELETE', headers: authHeaders });
-    fetchAll();
+  const handleDeleteCart = async (userEmail) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/cart/${userEmail}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-key': adminKey }
+      });
+      if (!response.ok) throw new Error('Failed to delete cart');
+      loadAdminData(); // Refresh data
+      alert('Cart deleted successfully');
+    } catch (error) {
+      alert('Error deleting cart: ' + error.message);
+    }
   };
 
-  const getUserProducts = (email) => {
-    if (!Array.isArray(products)) return [];
-    return products.filter(p => p.owner === email);
+  const handleStockChange = (productId, value) => {
+    setStockUpdates(prev => ({
+      ...prev,
+      [productId]: Number(value)
+    }));
   };
 
-  const getUserCart = (email) => {
-    if (!Array.isArray(carts)) return null;
-    return carts.find(c => c.userEmail === email);
+  const saveStock = async (productId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/products/${productId}/admin/stock`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey
+        },
+        body: JSON.stringify({
+          stock: Number(stockUpdates[productId])
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to update stock');
+      loadAdminData(); // Refresh data
+      alert('Stock updated successfully');
+    } catch (error) {
+      alert('Error updating stock: ' + error.message);
+    }
   };
-
-  const totalCartItems = carts.reduce((sum, c) => sum + (c.totalItems || (c.items?.length || 0)), 0);
 
   const handleApproveProduct = async (productId) => {
     try {
@@ -226,10 +170,10 @@ function AdminPanel() {
         }
       });
       if (!response.ok) throw new Error('Failed to approve product');
-      fetchAll();
-      alert('Product approved successfully!');
-    } catch (err) {
-      alert('Error approving product');
+      loadAdminData(); // Refresh data
+      alert('Product approved successfully');
+    } catch (error) {
+      alert('Error approving product: ' + error.message);
     }
   };
 
@@ -243,24 +187,23 @@ function AdminPanel() {
         }
       });
       if (!response.ok) throw new Error('Failed to reject product');
-      fetchAll();
-      alert('Product rejected');
-    } catch (err) {
-      alert('Error rejecting product');
+      loadAdminData(); // Refresh data
+      alert('Product rejected successfully');
+    } catch (error) {
+      alert('Error rejecting product: ' + error.message);
     }
   };
+
+  if (loading) {
+    return <div style={styles.loadingContainer}>Loading admin panel...</div>;
+  }
 
   return (
     <div style={styles.container}>
       <div style={styles.headerRow}>
         <h2 style={styles.heading}>Admin Panel</h2>
         <div style={styles.headerActions}>
-          <button onClick={fetchAll} style={styles.primaryBtn}>Refresh</button>
-          <button onClick={saveAllStocks} style={styles.primaryBtn}>Save All Stocks</button>
-          <label style={styles.toggleLabel}>
-            <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
-            Auto-refresh
-          </label>
+          <button onClick={loadAdminData} style={styles.primaryBtn}>Refresh Data</button>
           <button onClick={handleLogout} style={styles.dangerBtn}>Logout</button>
         </div>
       </div>
@@ -268,295 +211,291 @@ function AdminPanel() {
       <div style={styles.kpiGrid}>
         <div style={styles.kpiCard}>
           <div style={styles.kpiTitle}>Regular Users</div>
-          <div style={styles.kpiValue}>{users.length - admins.length}</div>
+          <div style={styles.kpiValue}>{state.users.length - state.admins.length}</div>
         </div>
         <div style={styles.kpiCard}>
           <div style={styles.kpiTitle}>Admin Users</div>
-          <div style={styles.kpiValue}>{admins.length}</div>
+          <div style={styles.kpiValue}>{state.admins.length}</div>
         </div>
         <div style={styles.kpiCard}>
           <div style={styles.kpiTitle}>Total Products</div>
-          <div style={styles.kpiValue}>{products.length}</div>
+          <div style={styles.kpiValue}>{state.products.length}</div>
         </div>
         <div style={styles.kpiCard}>
           <div style={styles.kpiTitle}>Items in Carts</div>
-          <div style={styles.kpiValue}>{totalCartItems}</div>
+          <div style={styles.kpiValue}>{state.carts.reduce((sum, c) => sum + (c.totalItems || (c.items?.length || 0)), 0)}</div>
         </div>
       </div>
 
-      <div style={styles.updatedAt}>Last updated: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : '—'}</div>
+      <div style={styles.updatedAt}>Last updated: {new Date().toLocaleTimeString()}</div>
 
-      {loading ? <div>Loading...</div> : (
-        <>
-          <section style={styles.section}>
-            <h3 style={styles.sectionTitle}>Admin Users</h3>
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead style={styles.theadSticky}>
-                  <tr>
-                    <th>Email</th>
-                    <th>Username</th>
-                    <th>Created At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {admins.map((admin, idx) => (
-                    <tr key={admin._id || admin.email} style={idx % 2 ? styles.zebraRow : undefined}>
-                      <td>{admin.email}</td>
-                      <td>{admin.username}</td>
-                      <td>{admin.createdAt ? new Date(admin.createdAt).toLocaleString() : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+      <section style={styles.section}>
+        <h3 style={styles.sectionTitle}>Admin Users</h3>
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead style={styles.theadSticky}>
+              <tr>
+                <th>Email</th>
+                <th>Username</th>
+                <th>Created At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.admins.map((admin, idx) => (
+                <tr key={admin._id || admin.email} style={idx % 2 ? styles.zebraRow : undefined}>
+                  <td>{admin.email}</td>
+                  <td>{admin.username}</td>
+                  <td>{admin.createdAt ? new Date(admin.createdAt).toLocaleString() : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-          <section style={styles.section}>
-            <h3 style={styles.sectionTitle}>Regular Users</h3>
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead style={styles.theadSticky}>
-                  <tr>
-                    <th>Email</th>
-                    <th>Username</th>
-                    <th>Role</th>
-                    <th>Products Added</th>
-                    <th>Cart Items</th>
-                    <th>Last Cart Update</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users
-                    .filter(u => u.role !== 'admin') // Only non-admin users
-                    .map((u, idx) => {
-                      const userProducts = getUserProducts(u.email);
-                      const userCart = getUserCart(u.email);
-                      return (
-                        <tr key={u._id || u.email} style={idx % 2 ? styles.zebraRow : undefined}>
-                          <td>{u.email}</td>
-                          <td>{u.username}</td>
-                          <td>{u.role}</td>
-                          <td>
-                            {userProducts.length === 0 ? 'None' : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
-                                {userProducts.map(p => (
-                                  <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <span>{p.name} (₹{p.price})</span>
-                                    <button style={styles.smallDangerBtn} onClick={() => handleDeleteProduct(p._id)}>Delete</button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                          <td>
-                            {userCart && userCart.items.length > 0 ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
-                                {userCart.items.map((i, iIdx) => (
-                                  <div key={i.productId || iIdx}>
-                                    {i.name} (Qty: {i.quantity}) - ₹{i.price}
-                                  </div>
-                                ))}
-                                <button style={styles.smallDangerBtn} onClick={() => handleDeleteCart(u.email)}>Delete Cart</button>
-                              </div>
-                            ) : 'Empty'}
-                          </td>
-                          <td>
-                            {userCart ? new Date(userCart.lastUpdated).toLocaleString() : 'Never'}
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
-                              <button style={styles.smallDangerBtn} onClick={() => handleDeleteUser(u.email)}>Delete User</button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section style={styles.section}>
-            <h3 style={styles.sectionTitle}>Pending Products</h3>
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead style={styles.theadSticky}>
-                  <tr>
-                    <th>Name</th>
-                    <th>Seller</th>
-                    <th>Price</th>
-                    <th>Material</th>
-                    <th>Stock</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products
-                    .filter(p => p.status === 'pending')
-                    .map((product, idx) => (
-                      <tr key={product._id} style={idx % 2 ? styles.zebraRow : undefined}>
-                        <td>{product.name}</td>
-                        <td>{product.owner}</td>
-                        <td>₹{product.price}</td>
-                        <td>{product.material}</td>
-                        <td>{product.stock}</td>
-                        <td style={{ display: 'flex', gap: '10px' }}>
-                          <button 
-                            style={styles.approveBtn} 
-                            onClick={() => handleApproveProduct(product._id)}
-                          >
-                            Approve
-                          </button>
-                          <button 
-                            style={styles.rejectBtn} 
-                            onClick={() => handleRejectProduct(product._id)}
-                          >
-                            Reject
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section style={styles.section}>
-            <h3 style={styles.sectionTitle}>All Products & Stock</h3>
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead style={styles.theadSticky}>
-                  <tr>
-                    <th>Name</th>
-                    <th>Owner</th>
-                    <th>Price</th>
-                    <th>Material</th>
-                    <th>Rating</th>
-                    <th>Stock</th>
-                    <th>In Stock</th>
-                    <th>Added</th>
-                    <th>Updated</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((p, idx) => (
-                    <tr key={p._id} style={idx % 2 ? styles.zebraRow : undefined}>
-                      <td>{p.name}</td>
-                      <td>{p.owner}</td>
-                      <td>{p.price}</td>
-                      <td>{p.material}</td>
-                      <td>{p.rating}</td>
+      <section style={styles.section}>
+        <h3 style={styles.sectionTitle}>Regular Users</h3>
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead style={styles.theadSticky}>
+              <tr>
+                <th>Email</th>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Products Added</th>
+                <th>Cart Items</th>
+                <th>Last Cart Update</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.users
+                .filter(u => u.role !== 'admin') // Only non-admin users
+                .map((u, idx) => {
+                  const userProducts = state.products.filter(p => p.owner === u.email);
+                  const userCart = state.carts.find(c => c.userEmail === u.email);
+                  return (
+                    <tr key={u._id || u.email} style={idx % 2 ? styles.zebraRow : undefined}>
+                      <td>{u.email}</td>
+                      <td>{u.username}</td>
+                      <td>{u.role}</td>
                       <td>
-                        <div style={{display:'flex', gap:8, alignItems:'center'}}>
-                          <input type="number" min="0" value={stockUpdates[p._id] ?? (typeof p.stock==='number'?p.stock:0)} onChange={(e)=>handleStockChange(p._id, e.target.value)} style={styles.input} />
-                          <button style={styles.primaryBtn} onClick={()=>saveStock(p._id)}>Save</button>
+                        {userProducts.length === 0 ? 'None' : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
+                            {userProducts.map(p => (
+                              <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span>{p.name} (₹{p.price})</span>
+                                <button style={styles.smallDangerBtn} onClick={() => handleDeleteProduct(p._id)}>Delete</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {userCart && userCart.items.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
+                            {userCart.items.map((i, iIdx) => (
+                              <div key={i.productId || iIdx}>
+                                {i.name} (Qty: {i.quantity}) - ₹{i.price}
+                              </div>
+                            ))}
+                            <button style={styles.smallDangerBtn} onClick={() => handleDeleteCart(u.email)}>Delete Cart</button>
+                          </div>
+                        ) : 'Empty'}
+                      </td>
+                      <td>
+                        {userCart ? new Date(userCart.lastUpdated).toLocaleString() : 'Never'}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
+                          <button style={styles.smallDangerBtn} onClick={() => handleDeleteUser(u.email)}>Delete User</button>
                         </div>
                       </td>
-                      <td>{(typeof p.stock==='number'?p.stock:0) > 0 ? 'Yes' : 'No'}</td>
-                      <td>{p.createdAt ? new Date(p.createdAt).toLocaleString() : '—'}</td>
-                      <td>{p.updatedAt ? new Date(p.updatedAt).toLocaleString() : '—'}</td>
-                      <td>
-                        <button style={styles.smallDangerBtn} onClick={() => handleDeleteProduct(p._id)}>Delete</button>
-                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-          <section style={styles.section}>
-            <h3 style={styles.sectionTitle}>All Carts</h3>
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead style={styles.theadSticky}>
-                  <tr>
-                    <th>User Email</th>
-                    <th>Products</th>
-                    <th>Total Items</th>
-                    <th>Last Updated</th>
-                    <th>Actions</th>
+      <section style={styles.section}>
+        <h3 style={styles.sectionTitle}>Pending Products</h3>
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead style={styles.theadSticky}>
+              <tr>
+                <th>Name</th>
+                <th>Seller</th>
+                <th>Price</th>
+                <th>Material</th>
+                <th>Stock</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.products
+                .filter(p => p.status === 'pending')
+                .map((product, idx) => (
+                  <tr key={product._id} style={idx % 2 ? styles.zebraRow : undefined}>
+                    <td>{product.name}</td>
+                    <td>{product.owner}</td>
+                    <td>₹{product.price}</td>
+                    <td>{product.material}</td>
+                    <td>{product.stock}</td>
+                    <td style={{ display: 'flex', gap: '10px' }}>
+                      <button 
+                        style={styles.approveBtn} 
+                        onClick={() => handleApproveProduct(product._id)}
+                      >
+                        Approve
+                      </button>
+                      <button 
+                        style={styles.rejectBtn} 
+                        onClick={() => handleRejectProduct(product._id)}
+                      >
+                        Reject
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {Array.isArray(carts) && carts.length > 0 ? carts.map((c, idx) => (
-                    <tr key={c._id || c.userEmail} style={idx % 2 ? styles.zebraRow : undefined}>
-                      <td>{c.userEmail}</td>
-                      <td>
-                        {Array.isArray(c.items) && c.items.map((i, iIdx) => (
-                          <div key={i.productId || iIdx}>
-                            {i.name} (Qty: {i.quantity}) - ₹{i.price}
-                          </div>
-                        ))}
-                      </td>
-                      <td>{c.totalItems || (c.items && c.items.length) || 0}</td>
-                      <td>{c.lastUpdated ? new Date(c.lastUpdated).toLocaleString() : '—'}</td>
-                      <td>
-                        <button style={styles.smallDangerBtn} onClick={() => handleDeleteCart(c.userEmail)}>Delete Cart</button>
-                      </td>
-                    </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan="5" style={{textAlign: 'center', padding: '20px'}}>No carts found</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-          <section style={styles.section}>
-            <h3 style={styles.sectionTitle}>All Activities</h3>
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead style={styles.theadSticky}>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>User Email</th>
-                    <th>Activity Type</th>
-                    <th>Details</th>
+      <section style={styles.section}>
+        <h3 style={styles.sectionTitle}>All Products & Stock</h3>
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead style={styles.theadSticky}>
+              <tr>
+                <th>Name</th>
+                <th>Owner</th>
+                <th>Price</th>
+                <th>Material</th>
+                <th>Rating</th>
+                <th>Stock</th>
+                <th>In Stock</th>
+                <th>Added</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.products.map((p, idx) => (
+                <tr key={p._id} style={idx % 2 ? styles.zebraRow : undefined}>
+                  <td>{p.name}</td>
+                  <td>{p.owner}</td>
+                  <td>{p.price}</td>
+                  <td>{p.material}</td>
+                  <td>{p.rating}</td>
+                  <td>
+                    <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                      <input type="number" min="0" value={stockUpdates[p._id] ?? (typeof p.stock==='number'?p.stock:0)} onChange={(e)=>handleStockChange(p._id, e.target.value)} style={styles.input} />
+                      <button style={styles.primaryBtn} onClick={()=>saveStock(p._id)}>Save</button>
+                    </div>
+                  </td>
+                  <td>{(typeof p.stock==='number'?p.stock:0) > 0 ? 'Yes' : 'No'}</td>
+                  <td>{p.createdAt ? new Date(p.createdAt).toLocaleString() : '—'}</td>
+                  <td>{p.updatedAt ? new Date(p.updatedAt).toLocaleString() : '—'}</td>
+                  <td>
+                    <button style={styles.smallDangerBtn} onClick={() => handleDeleteProduct(p._id)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section style={styles.section}>
+        <h3 style={styles.sectionTitle}>All Carts</h3>
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead style={styles.theadSticky}>
+              <tr>
+                <th>User Email</th>
+                <th>Products</th>
+                <th>Total Items</th>
+                <th>Last Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.isArray(state.carts) && state.carts.length > 0 ? state.carts.map((c, idx) => (
+                <tr key={c._id || c.userEmail} style={idx % 2 ? styles.zebraRow : undefined}>
+                  <td>{c.userEmail}</td>
+                  <td>
+                    {Array.isArray(c.items) && c.items.map((i, iIdx) => (
+                      <div key={i.productId || iIdx}>
+                        {i.name} (Qty: {i.quantity}) - ₹{i.price}
+                      </div>
+                    ))}
+                  </td>
+                  <td>{c.totalItems || (c.items && c.items.length) || 0}</td>
+                  <td>{c.lastUpdated ? new Date(c.lastUpdated).toLocaleString() : '—'}</td>
+                  <td>
+                    <button style={styles.smallDangerBtn} onClick={() => handleDeleteCart(c.userEmail)}>Delete Cart</button>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="5" style={{textAlign: 'center', padding: '20px'}}>No carts found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section style={styles.section}>
+        <h3 style={styles.sectionTitle}>All Activities</h3>
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead style={styles.theadSticky}>
+              <tr>
+                <th>Timestamp</th>
+                <th>User Email</th>
+                <th>Activity Type</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.activities.length === 0 ? (
+                <tr>
+                  <td colSpan="4" style={{textAlign: 'center', padding: '20px'}}>No activities recorded yet</td>
+                </tr>
+              ) : (
+                state.activities.map((activity, index) => (
+                  <tr key={index} style={index % 2 ? styles.zebraRow : undefined}>
+                    <td>{activity.timestamp ? new Date(activity.timestamp).toLocaleString() : '—'}</td>
+                    <td>{activity.email || '—'}</td>
+                    <td>
+                      <span style={{
+                        ...styles.activityBadge,
+                        backgroundColor: 
+                          activity.type === 'product_added' ? '#e3f2fd' : 
+                          activity.type === 'cart_updated' ? '#fff3e0' : 
+                          '#e8f5e9',
+                        color: 
+                          activity.type === 'product_added' ? '#0d47a1' : 
+                          activity.type === 'cart_updated' ? '#e65100' : 
+                          '#1b5e20'
+                      }}>
+                        {activity.type === 'product_added' ? 'Product Added' : 
+                         activity.type === 'cart_updated' ? 'Cart Updated' : 
+                         'User Registered'}
+                      </span>
+                    </td>
+                    <td>{activity.details || '—'}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {activities.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" style={{textAlign: 'center', padding: '20px'}}>No activities recorded yet</td>
-                    </tr>
-                  ) : (
-                    activities.map((activity, index) => (
-                      <tr key={index} style={index % 2 ? styles.zebraRow : undefined}>
-                        <td>{activity.timestamp ? new Date(activity.timestamp).toLocaleString() : '—'}</td>
-                        <td>{activity.email || '—'}</td>
-                        <td>
-                          <span style={{
-                            ...styles.activityBadge,
-                            backgroundColor: 
-                              activity.type === 'product_added' ? '#e3f2fd' : 
-                              activity.type === 'cart_updated' ? '#fff3e0' : 
-                              '#e8f5e9',
-                            color: 
-                              activity.type === 'product_added' ? '#0d47a1' : 
-                              activity.type === 'cart_updated' ? '#e65100' : 
-                              '#1b5e20'
-                          }}>
-                            {activity.type === 'product_added' ? 'Product Added' : 
-                             activity.type === 'cart_updated' ? 'Cart Updated' : 
-                             'User Registered'}
-                          </span>
-                        </td>
-                        <td>{activity.details || '—'}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </>
-      )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
@@ -564,8 +503,10 @@ function AdminPanel() {
 const styles = {
   container: {
     padding: '40px 30px',
-    minHeight: '80vh',
-    background: 'linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%)'
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%)',
+    overflowX: 'hidden',
+    position: 'relative' // Add this
   },
   headerRow: {
     display: 'flex',
@@ -602,15 +543,6 @@ const styles = {
     cursor: 'pointer',
     fontWeight: '600'
   },
-  toggleLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    background: '#fff',
-    border: '1px solid #e9ecef',
-    padding: '6px 10px',
-    borderRadius: '8px'
-  },
   kpiGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
@@ -643,27 +575,25 @@ const styles = {
     background: '#fff',
     borderRadius: '14px',
     padding: '20px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.06)'
-  },
-  sectionTitle: {
-    margin: '0 0 20px 0',
-    color: '#2c3e50',
-    borderBottom: '1px solid #e9ecef',
-    paddingBottom: '15px'
+    boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+    overflowX: 'auto',
+    minHeight: '200px' // Add minimum height
   },
   tableWrap: {
     width: '100%',
     overflowX: 'auto',
     borderRadius: '10px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-    maxHeight: '400px',
-    overflowY: 'auto'
+    maxHeight: '500px', // Increase max height
+    overflowY: 'auto',
+    backgroundColor: '#fff'
   },
   table: {
     width: '100%',
     borderCollapse: 'separate',
     borderSpacing: 0,
-    background: 'white'
+    background: 'white',
+    minWidth: '800px' // Add minimum width
   },
   theadSticky: {
     position: 'sticky',
@@ -714,8 +644,13 @@ const styles = {
     borderRadius: '6px',
     cursor: 'pointer',
     fontWeight: '600'
+  },
+  loadingContainer: {
+    textAlign: 'center',
+    padding: '40px',
+    fontSize: '1.2em',
+    color: '#666'
   }
 };
 
 export default AdminPanel;
-

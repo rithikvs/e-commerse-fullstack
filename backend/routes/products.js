@@ -175,4 +175,82 @@ router.put('/:id/reject', async (req, res) => {
   }
 });
 
+// Update product stock after order
+router.put('/:id/stock', async (req, res) => {
+  try {
+    const { reduceBy } = req.body;
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // Ensure current stock and reduction amount are numbers
+    const currentStock = Number(product.stock) || 0;
+    const reduction = Number(reduceBy) || 1;
+
+    if (currentStock < reduction) {
+      return res.status(400).json({ 
+        message: `Insufficient stock for ${product.name}. Only ${currentStock} items available.`
+      });
+    }
+
+    // Update stock and inStock status
+    const newStock = currentStock - reduction;
+    product.stock = newStock;
+    product.inStock = newStock > 0;
+    await product.save();
+
+    res.json({ 
+      message: 'Stock updated successfully', 
+      product: {
+        id: product._id,
+        name: product.name,
+        stock: product.stock,
+        inStock: product.inStock
+      }
+    });
+  } catch (error) {
+    console.error('Stock update error:', error);
+    res.status(500).json({ 
+      message: 'Error updating stock', 
+      error: error.message 
+    });
+  }
+});
+
+// Admin: Delete product
+router.delete('/:id', async (req, res) => {
+  try {
+    const key = req.headers['x-admin-key'];
+    if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
+    
+    await Product.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Product deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting product', error: error.message });
+  }
+});
+
+// Admin: Update stock
+router.put('/:id/stock', async (req, res) => {
+  try {
+    const { stock } = req.body;
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { 
+        stock: Number(stock),
+        inStock: Number(stock) > 0
+      },
+      { new: true }
+    );
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    res.json({ message: 'Stock updated successfully', product });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating stock', error: error.message });
+  }
+});
+
 module.exports = router;

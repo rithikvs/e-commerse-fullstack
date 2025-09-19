@@ -8,6 +8,15 @@ function Cart({ cartItems, removeFromCart }) {
     return sum + price * (item.quantity || 1);
   }, 0);
 
+  // Format cart items correctly
+  const prepareCartItems = cartItems.map(item => ({
+    ...item,
+    _id: item._id || item.productId, // Use MongoDB _id
+    quantity: item.quantity || 1,
+    price: String(item.price).replace(/[₹,]/g, ''), // Clean price format
+    inStock: item.inStock !== false // Default to true if not specified
+  }));
+
   return (
     <div style={styles.container}>
       <h2 style={styles.title}>Your Shopping Cart</h2>
@@ -40,7 +49,10 @@ function Cart({ cartItems, removeFromCart }) {
           <div style={styles.totalSection}>
             <h3 style={styles.totalLabel}>Total Amount:</h3>
             <div style={styles.totalValue}>₹{totalAmount.toFixed(2)}</div>
-            <Link to="/payment">
+            <Link 
+              to="/payment" 
+              state={{ cartItems: prepareCartItems }}
+            >
               <button className="buyBtn" style={styles.buyBtn}>Buy All</button>
             </Link>
           </div>

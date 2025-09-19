@@ -84,4 +84,30 @@ router.get('/admins', async (req, res) => {
   }
 });
 
+// Admin: Delete user
+router.delete('/users/:email', async (req, res) => {
+  try {
+    const key = req.headers['x-admin-key'];
+    if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
+    
+    await User.findOneAndDelete({ email: req.params.email });
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting user', error: error.message });
+  }
+});
+
+// Admin: Get all users
+router.get('/users', async (req, res) => {
+  try {
+    const key = req.headers['x-admin-key'];
+    if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
+    
+    const users = await User.find({});
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching users', error: error.message });
+  }
+});
+
 module.exports = router;

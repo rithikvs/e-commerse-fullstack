@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Cart = require('../models/cart');
 
+const ADMIN_KEY = 'your_admin_key_here'; // Replace with your actual admin key
+
 // Save or update user's cart
 router.post('/save', async (req, res) => {
   const { userEmail, items } = req.body;
@@ -24,9 +26,25 @@ router.post('/save', async (req, res) => {
   }
 });
 
+// Admin: Delete cart
+router.delete('/:userEmail', async (req, res) => {
+  try {
+    const key = req.headers['x-admin-key'];
+    if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
+    
+    await Cart.findOneAndDelete({ userEmail: req.params.userEmail });
+    res.json({ message: 'Cart deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting cart', error: error.message });
+  }
+});
+
 // Admin: Get all carts
 router.get('/all', async (req, res) => {
   try {
+    const key = req.headers['x-admin-key'];
+    if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
+    
     const carts = await Cart.find({});
     console.log('Fetched carts:', carts.length);
     res.json(carts);
