@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 function Payment({ cartItems: propCartItems }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [paymentMethod, setPaymentMethod] = useState('Credit Card');
   const [totalAmount, setTotalAmount] = useState(0);
   const [cardDetails, setCardDetails] = useState({
@@ -14,18 +15,17 @@ function Payment({ cartItems: propCartItems }) {
   const [orderProcessing, setOrderProcessing] = useState(false);
   const user = JSON.parse(localStorage.getItem('currentUser'));
 
+  // Get cart items from location state or props
+  const cartItems = location.state?.cartItems || propCartItems || [];
+
   useEffect(() => {
-    // Prefer cartItems from props (App state), fallback to localStorage
-    let cartItems = propCartItems;
-    if (!cartItems || cartItems.length === 0) {
-      cartItems = JSON.parse(localStorage.getItem('cartItems')) || [];
-    }
+    // Calculate total from cart items
     const total = cartItems.reduce((sum, item) => {
       const price = Number(String(item.price).replace(/[^0-9.]/g, ''));
       return sum + price * (item.quantity || 1);
     }, 0);
     setTotalAmount(total);
-  }, [propCartItems]);
+  }, [cartItems]);
 
   const handlePaymentMethodChange = (e) => {
     setPaymentMethod(e.target.value);
@@ -52,46 +52,41 @@ function Payment({ cartItems: propCartItems }) {
         throw new Error('Please fill all shipping details');
       }
 
-      // Process each item in cart
-      for (const item of propCartItems) {
-        const productId = item._id || item.productId;
-        if (!productId) continue;
-
+      // Update stock for each product before showing success
+      for (const item of cartItems) {
         try {
+          const productId = item._id;
+          if (!productId) continue;
+
           const response = await fetch(`http://localhost:5000/api/products/${productId}/stock`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               reduceBy: item.quantity || 1
             })
           });
 
-          const result = await response.json();
           if (!response.ok) {
-            throw new Error(result.message || 'Failed to update stock');
+            const error = await response.json();
+            throw new Error(error.message || `Failed to update stock for ${item.name}`);
           }
         } catch (error) {
-          throw new Error(`Failed to process item: ${item.name}`);
+          console.error('Stock update error:', error);
+          // Continue with other items even if one fails
         }
       }
 
-      // Clear user's cart
-      if (user?.email) {
-        await fetch(`http://localhost:5000/api/cart/${user.email}`, {
-          method: 'DELETE'
-        });
-      }
-
-      // Show success message with order details
+      // Show success message and clear cart
       const orderDetails = `
-✅ Order Placed Successfully!
+🎉 Order Placed Successfully!
 
 📦 Order Details:
 ----------------
-${propCartItems.map(item => 
+${cartItems.map(item => 
   `• ${item.name}
    Quantity: ${item.quantity || 1}
-   Price: ₹${String(item.price).replace(/[^0-9]/g, '')}`
+   Price: ₹${String(item.price).replace(/[^0-9]/g, '')}
+   Total: ₹${(Number(String(item.price).replace(/[^0-9]/g, '')) * (item.quantity || 1)).toFixed(2)}`
 ).join('\n\n')}
 
 💰 Total Amount: ₹${totalAmount.toFixed(2)}
@@ -104,11 +99,21 @@ Address: ${formValues.address}
 City: ${formValues.city}
 PIN: ${formValues.postalCode}
 
-Thank you for shopping with us! 🎉
-`;
+✅ Order ID: ORD${Date.now()}
+Expected Delivery: 5-7 business days
+
+Thank you for shopping with us! 🙏`;
+
+      // Clear cart after successful order
+      if (user?.email) {
+        await fetch(`http://localhost:5000/api/cart/${user.email}`, {
+          method: 'DELETE'
+        });
+      }
 
       alert(orderDetails);
       localStorage.removeItem('cartItems');
+      localStorage.removeItem('cartQuantities');
       navigate('/');
 
     } catch (err) {
@@ -382,3 +387,4 @@ const styles = {
 };
 
 export default Payment;
+

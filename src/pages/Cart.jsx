@@ -1,20 +1,63 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 function Cart({ cartItems, removeFromCart }) {
-  // Calculate total amount
-  const totalAmount = cartItems.reduce((sum, item) => {
+  // Initialize quantities from localStorage or fallback to cartItems
+  const [quantities, setQuantities] = useState(() => {
+    const savedQuantities = JSON.parse(localStorage.getItem('cartQuantities')) || {};
+    // Initialize with current cart items
+    const initialQuantities = {};
+    cartItems.forEach((item, index) => {
+      initialQuantities[index] = savedQuantities[index] || item.quantity || 1;
+    });
+    return initialQuantities;
+  });
+
+  // Save quantities to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('cartQuantities', JSON.stringify(quantities));
+    
+    // Update cart items with new quantities
+    const updatedItems = cartItems.map((item, index) => ({
+      ...item,
+      quantity: quantities[index] || 1
+    }));
+    localStorage.setItem('cartItems', JSON.stringify(updatedItems));
+  }, [quantities]);
+
+  const handleQuantityChange = (index, delta) => {
+    const item = cartItems[index];
+    const currentQty = quantities[index] || 1;
+    const newQuantity = currentQty + delta;
+    
+    // Don't allow quantity below 1
+    if (newQuantity < 1) return;
+    
+    // Don't allow quantity above stock
+    if (typeof item.stock === 'number' && newQuantity > item.stock) {
+      alert(`Only ${item.stock} items available in stock`);
+      return;
+    }
+
+    // Update quantities state
+    setQuantities(prev => ({
+      ...prev,
+      [index]: newQuantity
+    }));
+  };
+
+  // Calculate total with current quantities
+  const totalAmount = cartItems.reduce((sum, item, index) => {
     const price = Number(String(item.price).replace(/[^0-9.]/g, ''));
-    return sum + price * (item.quantity || 1);
+    return sum + price * (quantities[index] || 1);
   }, 0);
 
-  // Format cart items correctly
-  const prepareCartItems = cartItems.map(item => ({
+  // Format cart items with current quantities
+  const prepareCartItems = cartItems.map((item, index) => ({
     ...item,
-    _id: item._id || item.productId, // Use MongoDB _id
-    quantity: item.quantity || 1,
-    price: String(item.price).replace(/[₹,]/g, ''), // Clean price format
-    inStock: item.inStock !== false // Default to true if not specified
+    _id: item._id || item.productId,
+    quantity: quantities[index] || 1,
+    price: String(item.price).replace(/[₹,]/g, '')
   }));
 
   return (
@@ -33,7 +76,25 @@ function Cart({ cartItems, removeFromCart }) {
                 <p><strong>Price:</strong> ₹{String(item.price).replace(/^₹+/, '')}</p>
                 <p><strong>Material:</strong> {item.material}</p>
                 <p><strong>Rating:</strong> ⭐ {item.rating}</p>
-                <p><strong>Quantity:</strong> {item.quantity || 1}</p>
+                
+                <div style={styles.quantityControl}>
+                  <button 
+                    style={styles.quantityBtn}
+                    onClick={() => handleQuantityChange(index, -1)}
+                  >
+                    −
+                  </button>
+                  <span style={styles.quantityDisplay}>
+                    {quantities[index] || 1}
+                  </span>
+                  <button 
+                    style={{...styles.quantityBtn, backgroundColor: '#27ae60'}}
+                    onClick={() => handleQuantityChange(index, 1)}
+                  >
+                    +
+                  </button>
+                </div>
+
                 <div style={styles.buttonGroup}>
                   <button
                     className="removeBtn"
@@ -46,6 +107,7 @@ function Cart({ cartItems, removeFromCart }) {
               </div>
             ))}
           </div>
+          
           <div style={styles.totalSection}>
             <h3 style={styles.totalLabel}>Total Amount:</h3>
             <div style={styles.totalValue}>₹{totalAmount.toFixed(2)}</div>
@@ -163,6 +225,39 @@ const styles = {
     lineHeight: '24px',
     outline: 'none',
     boxSizing: 'border-box'
+  },
+  quantityControl: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    margin: '15px 0',
+    background: '#f8f9fa',
+    padding: '8px',
+    borderRadius: '25px',
+    width: 'fit-content'
+  },
+  quantityBtn: {
+    width: '30px',
+    height: '30px',
+    borderRadius: '15px',
+    border: 'none',
+    background: '#3498db',
+    color: 'white',
+    fontSize: '18px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0',
+    lineHeight: '1'
+  },
+  quantityDisplay: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#2c3e50',
+    minWidth: '40px',
+    textAlign: 'center'
   }
 };
 

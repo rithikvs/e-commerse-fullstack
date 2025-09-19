@@ -185,7 +185,6 @@ router.put('/:id/stock', async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Ensure current stock and reduction amount are numbers
     const currentStock = Number(product.stock) || 0;
     const reduction = Number(reduceBy) || 1;
 
@@ -202,7 +201,7 @@ router.put('/:id/stock', async (req, res) => {
     await product.save();
 
     res.json({ 
-      message: 'Stock updated successfully', 
+      message: 'Stock updated successfully',
       product: {
         id: product._id,
         name: product.name,
@@ -212,10 +211,7 @@ router.put('/:id/stock', async (req, res) => {
     });
   } catch (error) {
     console.error('Stock update error:', error);
-    res.status(500).json({ 
-      message: 'Error updating stock', 
-      error: error.message 
-    });
+    res.status(500).json({ message: 'Error updating stock' });
   }
 });
 
