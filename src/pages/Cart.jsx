@@ -25,6 +25,15 @@ function Cart({ cartItems, removeFromCart }) {
     localStorage.setItem('cartItems', JSON.stringify(updatedItems));
   }, [quantities]);
 
+  useEffect(() => {
+    // Update quantities when cart items change
+    const newQuantities = {};
+    cartItems.forEach((item, index) => {
+      newQuantities[index] = item.quantity || quantities[index] || 1;
+    });
+    setQuantities(newQuantities);
+  }, [cartItems]);
+
   const handleQuantityChange = (index, delta) => {
     const item = cartItems[index];
     const currentQty = quantities[index] || 1;

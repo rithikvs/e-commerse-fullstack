@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const Cart = require('../models/cart');
+const Cart = require('../models/Cart'); // Make sure Cart.js is capitalized
 
-const ADMIN_KEY = 'your_admin_key_here'; // Replace with your actual admin key
+// Fix admin key to use env variable
+const ADMIN_KEY = process.env.ADMIN_KEY || 'local-admin-key';
 
 // Save or update user's cart
 router.post('/save', async (req, res) => {

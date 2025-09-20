@@ -195,19 +195,14 @@ router.put('/:id/stock', async (req, res) => {
     }
 
     // Update stock and inStock status
-    const newStock = currentStock - reduction;
-    product.stock = newStock;
-    product.inStock = newStock > 0;
+    product.stock = currentStock - reduction;
+    product.inStock = product.stock > 0;
     await product.save();
 
-    res.json({ 
+    res.json({
       message: 'Stock updated successfully',
-      product: {
-        id: product._id,
-        name: product.name,
-        stock: product.stock,
-        inStock: product.inStock
-      }
+      newStock: product.stock,
+      inStock: product.inStock
     });
   } catch (error) {
     console.error('Stock update error:', error);

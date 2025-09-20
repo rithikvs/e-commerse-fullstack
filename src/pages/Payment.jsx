@@ -52,72 +52,64 @@ function Payment({ cartItems: propCartItems }) {
         throw new Error('Please fill all shipping details');
       }
 
-      // Update stock for each product before showing success
+      // Process each cart item and update stock
       for (const item of cartItems) {
-        try {
-          const productId = item._id;
-          if (!productId) continue;
+        const productId = item._id || item.productId;
+        const quantity = item.quantity || 1;
 
-          const response = await fetch(`http://localhost:5000/api/products/${productId}/stock`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              reduceBy: item.quantity || 1
-            })
-          });
+        // Update product stock
+        const response = await fetch(`http://localhost:5000/api/products/${productId}/stock`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            reduceBy: quantity
+          })
+        });
 
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || `Failed to update stock for ${item.name}`);
-          }
-        } catch (error) {
-          console.error('Stock update error:', error);
-          // Continue with other items even if one fails
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to update product stock');
         }
       }
 
-      // Show success message and clear cart
-      const orderDetails = `
-🎉 Order Placed Successfully!
-
-📦 Order Details:
-----------------
-${cartItems.map(item => 
-  `• ${item.name}
-   Quantity: ${item.quantity || 1}
-   Price: ₹${String(item.price).replace(/[^0-9]/g, '')}
-   Total: ₹${(Number(String(item.price).replace(/[^0-9]/g, '')) * (item.quantity || 1)).toFixed(2)}`
-).join('\n\n')}
-
-💰 Total Amount: ₹${totalAmount.toFixed(2)}
-💳 Payment Method: ${paymentMethod}
-
-🚚 Shipping Details:
-----------------
-Name: ${formValues.fullName}
-Address: ${formValues.address}
-City: ${formValues.city}
-PIN: ${formValues.postalCode}
-
-✅ Order ID: ORD${Date.now()}
-Expected Delivery: 5-7 business days
-
-Thank you for shopping with us! 🙏`;
-
-      // Clear cart after successful order
+      // Clear purchased items from cart
       if (user?.email) {
-        await fetch(`http://localhost:5000/api/cart/${user.email}`, {
-          method: 'DELETE'
-        });
+        try {
+          // Get current cart
+          const cartResponse = await fetch(`http://localhost:5000/api/cart/${user.email}`);
+          const currentCart = await cartResponse.json();
+          
+          // Remove purchased items
+          const remainingItems = currentCart.items?.filter(item => 
+            !cartItems.some(purchasedItem => 
+              purchasedItem._id === item.productId || 
+              purchasedItem.productId === item.productId
+            )
+          ) || [];
+
+          // Update cart
+          await fetch('http://localhost:5000/api/cart/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userEmail: user.email,
+              items: remainingItems
+            })
+          });
+
+          // Clear local storage
+          localStorage.setItem('cartItems', JSON.stringify(remainingItems));
+        } catch (error) {
+          console.error('Error updating cart:', error);
+        }
       }
 
-      alert(orderDetails);
-      localStorage.removeItem('cartItems');
-      localStorage.removeItem('cartQuantities');
+      alert('Order placed successfully!');
       navigate('/');
-
     } catch (err) {
-      alert(err.message || 'Error processing payment');
+      alert(err.message || 'Error processing order');
     } finally {
       setOrderProcessing(false);
     }
@@ -387,4 +379,3 @@ const styles = {
 };
 
 export default Payment;
-

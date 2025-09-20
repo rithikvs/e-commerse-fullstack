@@ -15,75 +15,191 @@ function AdminPanel() {
 
   const adminKey = JSON.parse(localStorage.getItem('currentUser'))?.adminKey;
 
-  useEffect(() => {
-    if (!adminKey) {
-      navigate('/login');
-      return;
-    }
-    loadAdminData();
-  }, [adminKey]);
+  const syncAllData = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/sync/all', {
+        headers: { 'x-admin-key': adminKey }
+      });
+      
+      if (!response.ok) throw new Error('Failed to sync data');
+      
+      const data = await response.json();
+      setState({
+        users: data.users || [],
+        admins: data.admins || [],
+        products: data.products || [],
+        carts: data.carts || [],
+        activities: generateActivities(data)
+      });
 
+      alert('Data synchronized successfully!');
+    } catch (error) {
+      console.error('Sync error:', error);
+      alert('Error syncing data: ' + error.message);
+    }
+  };
+
+  // Update verifyAdmin function
+  const verifyAdmin = async () => {
+    try {
+      const adminData = JSON.parse(localStorage.getItem('currentUser'));
+      if (!adminData || !adminData.adminKey) {
+        throw new Error('No admin credentials found');
+      }
+
+      const response = await fetch('http://localhost:5000/api/auth/admin/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminData.adminKey
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Admin verification failed');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Admin verification error:', error);
+      navigate('/admin/login');
+      return false;
+    }
+  };
+
+  // Add activity generation helper
+  const generateActivities = (data) => {
+    let activities = [];
+
+    // Product activities
+    data.products?.forEach(p => {
+      activities.push({
+        timestamp: p.createdAt,
+        email: p.owner,
+        type: 'product_added',
+        details: `Added product: ${p.name} (₹${p.price})`
+      });
+    });
+
+    // Cart activities
+    data.carts?.forEach(c => {
+      activities.push({
+        timestamp: c.updatedAt || c.lastUpdated,
+        email: c.userEmail,
+        type: 'cart_updated',
+        details: `Cart updated: ${c.items?.length || 0} items`
+      });
+    });
+
+    // Sort by timestamp
+    return activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  };
+
+  // Update loadAdminData function
   const loadAdminData = async () => {
     setLoading(true);
     try {
-      const headers = { 'x-admin-key': adminKey };
-      const [users, products, carts, admins] = await Promise.all([
-        fetch('http://localhost:5000/api/auth/all', { headers }).then(r => r.json()),
-        fetch('http://localhost:5000/api/products', { headers }).then(r => r.json()),
-        fetch('http://localhost:5000/api/cart/all', { headers }).then(r => r.json()),
-        fetch('http://localhost:5000/api/auth/admins', { headers }).then(r => r.json())
-      ]);
+      const adminData = JSON.parse(localStorage.getItem('currentUser'));
+      if (!adminData || !adminData.adminKey) {
+        throw new Error('No admin credentials found');
+      }
 
-      // Generate activities from data
-      let activities = [];
-
-      // Product activities
-      products?.forEach(p => {
-        activities.push({
-          timestamp: p.createdAt,
-          email: p.owner,
-          type: 'product_added',
-          details: `Added product: ${p.name} (₹${p.price})`
-        });
+      const response = await fetch('http://localhost:5000/api/auth/sync/all', {
+        headers: {
+          'x-admin-key': adminData.adminKey
+        }
       });
 
-      // Cart activities
-      carts?.forEach(c => {
-        activities.push({
-          timestamp: c.updatedAt || c.lastUpdated,
-          email: c.userEmail,
-          type: 'cart_updated',
-          details: `Cart updated: ${c.items?.length || 0} items`
-        });
-      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch admin data');
+      }
 
-      // Sort activities by timestamp
-      activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const data = await response.json();
+      console.log('Fetched data:', data); // Debug log
 
       setState({
-        users: users || [],
-        admins: admins || [],
-        products: products || [],
-        carts: carts || [],
-        activities: activities
+        users: data.users || [],
+        admins: data.admins || [],
+        products: data.products || [],
+        carts: data.carts || [],
+        activities: generateActivities(data)
       });
 
-      // Initialize stock values
+      // Update stock values
       const stocks = {};
-      products?.forEach(p => {
+      data.products?.forEach(p => {
         stocks[p._id] = p.stock || 0;
       });
       setStockUpdates(stocks);
 
     } catch (error) {
       console.error('Admin data load error:', error);
-      if (error.message.includes('unauthorized')) {
-        navigate('/login');
+      alert('Error loading admin data: ' + error.message);
+      if (error.message.includes('credentials')) {
+        navigate('/admin/login');
       }
     } finally {
       setLoading(false);
     }
   };
+
+  const downloadReport = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/generate-report', {
+        headers: { 'x-admin-key': adminKey }
+      });
+
+      if (!response.ok) throw new Error('Failed to generate report');
+      
+      const data = await response.json();
+      
+      // Format report data as CSV
+      const reportContent = `HANDMADE CRAFTS ADMIN REPORT
+Generated on: ${new Date().toLocaleString()}
+
+STATISTICS
+==========
+Total Users,${data.report.totalUsers}
+Total Admins,${data.report.totalAdmins}
+Total Products,${data.report.totalProducts}
+Active Products,${data.report.activeProducts}
+Pending Products,${data.report.pendingProducts}
+Total Orders,${data.report.totalOrders}
+Average Product Rating,${data.report.averageRating.toFixed(2)}
+Active Carts,${data.report.totalCarts}
+
+Generated by Admin Panel
+`;
+
+      // Create and download file
+      const blob = new Blob([reportContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('hidden', '');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `admin_report_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      alert('Report downloaded successfully!');
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      alert('Failed to download report: ' + error.message);
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      const isValid = await verifyAdmin();
+      if (isValid) {
+        await loadAdminData();
+      }
+    };
+
+    init();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
@@ -203,7 +319,8 @@ function AdminPanel() {
       <div style={styles.headerRow}>
         <h2 style={styles.heading}>Admin Panel</h2>
         <div style={styles.headerActions}>
-          <button onClick={loadAdminData} style={styles.primaryBtn}>Refresh Data</button>
+          <button onClick={syncAllData} style={styles.primaryBtn}>Sync Data</button>
+          <button onClick={loadAdminData} style={styles.primaryBtn}>Refresh</button>
           <button onClick={handleLogout} style={styles.dangerBtn}>Logout</button>
         </div>
       </div>
@@ -529,10 +646,12 @@ const styles = {
     backgroundColor: '#3498db',
     color: '#fff',
     border: 'none',
-    padding: '8px 14px',
+    padding: '10px 15px',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontWeight: '600'
+    fontWeight: '600',
+    fontSize: '0.9em',
+    transition: 'background-color 0.2s'
   },
   dangerBtn: {
     backgroundColor: '#e74c3c',
@@ -593,7 +712,7 @@ const styles = {
     borderCollapse: 'separate',
     borderSpacing: 0,
     background: 'white',
-    minWidth: '800px' // Add minimum width
+    minWidth: '1200px' // Increased minimum width
   },
   theadSticky: {
     position: 'sticky',
@@ -650,6 +769,24 @@ const styles = {
     padding: '40px',
     fontSize: '1.2em',
     color: '#666'
+  },
+  sectionTitle: {
+    fontSize: '1.5rem',
+    fontWeight: '600',
+    marginBottom: '1rem',
+    color: '#2c3e50'
+  },
+  loadingOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000
   }
 };
 
