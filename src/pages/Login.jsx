@@ -61,7 +61,7 @@ function Login() {
             <div style={styles.logoContainer}>
               <div style={styles.logo}>🎓</div>
             </div>
-            <h1 style={styles.welcomeTitle}>Welcome Backkkkkk</h1>
+            <h1 style={styles.welcomeTitle}>Welcome Back</h1>
             <p style={styles.welcomeText}>
               Sign in to continue your journey with us and unlock amazing features
             </p>
