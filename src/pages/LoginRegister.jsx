@@ -166,7 +166,7 @@ function LoginRegister({ onLogin }) {
                   name="username"
                   placeholder="Choose a username"
                   style={styles.input}
-                  className="enhanced-input"  // added
+                  className="enhanced-input"
                   value={formData.username}
                   onChange={handleChange}
                   required
@@ -181,7 +181,7 @@ function LoginRegister({ onLogin }) {
                 type="email"
                 placeholder="Enter your email address"
                 style={styles.input}
-                className="enhanced-input"  // added
+                className="enhanced-input"
                 value={formData.email}
                 onChange={handleChange}
                 required
@@ -196,7 +196,7 @@ function LoginRegister({ onLogin }) {
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Enter your password"
                   style={styles.passwordInput}
-                  className="enhanced-input"  // added
+                  className="enhanced-input"
                   value={formData.password}
                   onChange={handleChange}
                   required
@@ -441,7 +441,7 @@ const styles = {
     outline: 'none',
     background: 'rgba(248, 250, 252, 0.8)',
     backdropFilter: 'blur(10px)',
-    color: 'black' // added: ensure typed text is black
+    color: 'black' // ensure typed text is black
   },
   passwordContainer: {
     position: 'relative'
@@ -458,7 +458,7 @@ const styles = {
     backdropFilter: 'blur(10px)',
     width: '100%',
     boxSizing: 'border-box',
-    color: 'black' // added: ensure typed password text is black
+    color: 'black' // ensure typed password text is black
   },
   passwordToggle: {
     position: 'absolute',
@@ -581,3 +581,4 @@ styleSheet.innerHTML = `
 document.head.appendChild(styleSheet);
 
 export default LoginRegister;
+
