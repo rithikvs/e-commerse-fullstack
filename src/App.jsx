@@ -14,23 +14,13 @@ import AdminLogin from './pages/AdminLogin';
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
-  // Always start with null user (force login on reload)
-  const [cartItems, setCartItems] = useState([]);
-  const [user, setUser] = useState(null);
-
-  // On mount, clear any previous session if not on /login or /admin/login
-  useEffect(() => {
-    const allowed = ['/login', '/admin/login'];
-    if (!allowed.includes(location.pathname)) {
-      localStorage.removeItem('currentUser');
-      setUser(null);
-      setCartItems([]);
-      // If not already on login, redirect to login
-      if (location.pathname !== '/login') {
-        navigate('/login', { replace: true });
-      }
-    }
-  }, []); // Only run on mount
+  // Load user and cart from localStorage so visitors can browse; actions remain protected.
+  const [cartItems, setCartItems] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('cartItems')) || []; } catch { return []; }
+  });
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('currentUser')) || null; } catch { return null; }
+  });
 
   // Fetch cart from MongoDB when user logs in
   useEffect(() => {
@@ -71,7 +61,13 @@ function AppContent() {
     }
   };
 
+  // Add to cart but require authentication; redirect to login otherwise.
   const addToCart = (product) => {
+    if (!user || !user.email) {
+      alert('Please login to add items to your cart.');
+      navigate('/login');
+      return;
+    }
     // Find if product already exists in cart (by productId, _id, or id)
     const productId = product._id || product.id;
     const existingIndex = cartItems.findIndex(
@@ -145,41 +141,43 @@ function AppContent() {
 
   return (
     <div>
-      {/* Header and Navigation */}
-      {isAuthenticated && (
-        <>
-          <header style={styles.header}>
-            <h1>Handmade Crafts</h1>
-          </header>
-          
-          {!isAdmin ? (
-            <nav style={styles.navbar}>
-              <Link to="/" className="nav-link" style={styles.navLink}>Home</Link>
-              <Link to="/about" className="nav-link" style={styles.navLink}>About</Link>
-              <Link to="/contact" className="nav-link" style={styles.navLink}>Contact</Link>
-              <Link to="/cart" className="nav-link" style={styles.navLink}>Cart ({cartItems.length})</Link>
-              <Link to="/sell" className="nav-link" style={styles.navLink}>Sell</Link>
-              <span className="nav-link" style={styles.navLink}>Welcome, {user.username}</span>
-              <span className="nav-link" style={styles.navLink} onClick={handleLogout}>Logout</span>
-            </nav>
-          ) : (
-            <nav style={styles.navbar}>
-              <Link to="/admin" className="nav-link" style={styles.navLink}>Admin Panel</Link>
-              <span className="nav-link" style={styles.navLink}>Admin: {user.username}</span>
-              <span className="nav-link" style={styles.navLink} onClick={handleLogout}>Logout</span>
-            </nav>
-          )}
-        </>
-      )}
+      {/* Header and Navigation (always visible so visitors can browse) */}
+      <header style={styles.header}>
+        <h1>Handmade Crafts</h1>
+      </header>
+      <nav style={styles.navbar}>
+        <Link to="/" className="nav-link" style={styles.navLink}>Home</Link>
+        <Link to="/about" className="nav-link" style={styles.navLink}>About</Link>
+        <Link to="/contact" className="nav-link" style={styles.navLink}>Contact</Link>
+        <Link to="/cart" className="nav-link" style={styles.navLink}>Cart ({cartItems.length})</Link>
+        <Link to="/sell" className="nav-link" style={styles.navLink}>Sell</Link>
+        {isAuthenticated ? (
+          <>
+            {!isAdmin && <span className="nav-link" style={styles.navLink}>Welcome, {user.username}</span>}
+            {isAdmin && <Link to="/admin" className="nav-link" style={styles.navLink}>Admin Panel</Link>}
+            <span className="nav-link" style={styles.navLink} onClick={handleLogout}>Logout</span>
+          </>
+        ) : (
+          <>
+            <Link to="/login" className="nav-link" style={styles.navLink}>Login / Register</Link>
+          </>
+        )}
+      </nav>
 
       {/* Routes */}
       <Routes>
+        {/* Public pages */}
         <Route path="/login" element={
           isAuthenticated ? 
             (isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/" replace />) 
             : <LoginRegister onLogin={handleLogin} />
         } />
         
+        <Route path="/" element={<Home addToCart={addToCart} user={user} />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
+        
+        {/* Protected routes (actions) */}
         {/* Admin routes */}
         <Route path="/admin" element={
           <ProtectedAdminRoute>
@@ -187,23 +185,23 @@ function AppContent() {
           </ProtectedAdminRoute>
         } />
         
-        {/* Regular user routes */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Home addToCart={addToCart} user={user} />
-          </ProtectedRoute>
-        } />
         <Route path="/cart" element={
           <ProtectedRoute>
             <Cart cartItems={cartItems} removeFromCart={removeFromCart} />
           </ProtectedRoute>
         } />
-        <Route path="/about" element={<About />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/payment" element={<Payment cartItems={cartItems} />} />
-        <Route path="/sell" element={<Sell user={user} />} />
-        
-        <Route path="*" element={<Navigate to={isAdmin ? "/admin" : "/"} replace />} />
+        <Route path="/payment" element={
+          <ProtectedRoute>
+            <Payment cartItems={cartItems} />
+          </ProtectedRoute>
+        } />
+        <Route path="/sell" element={
+          <ProtectedRoute>
+            <Sell user={user} />
+          </ProtectedRoute>
+        } />
+         
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );

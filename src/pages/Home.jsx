@@ -147,7 +147,15 @@ function Home({ addToCart }) {
                   <button
                     className="buyButton"
                     style={{...styles.buyButton, transform: 'none', transition: 'none', boxShadow: 'none', opacity: isOut ? 0.5 : 1, pointerEvents: isOut ? 'none' : 'auto'}}
-                    onClick={() => navigate('/payment')}
+                    onClick={() => {
+                      if (!user || !user.email) {
+                        alert('Please login to purchase items.');
+                        navigate('/login');
+                        return;
+                      }
+                      // send the single-product cart to payment
+                      navigate('/payment', { state: { cartItems: [{ ...product, quantity: 1, _id: product._id || product.id }] } });
+                    }}
                     disabled={isOut}
                   >
                     Buy Now

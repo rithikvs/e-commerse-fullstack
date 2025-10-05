@@ -14,6 +14,19 @@ function Sell({ user }) {
   const [preview, setPreview] = useState(null);
   const navigate = useNavigate();
 
+  // If user is not logged in, show prompt to login before allowing to sell
+  if (!user || !user.email) {
+    return (
+      <div style={{ ...styles.container, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ background: 'white', padding: 30, borderRadius: 12, boxShadow: '0 6px 20px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+          <h2 style={{ marginBottom: 12 }}>Please login to sell products</h2>
+          <p style={{ marginBottom: 20 }}>You can browse items without logging in, but selling requires an account.</p>
+          <button style={{ padding: '10px 18px', borderRadius: 8, backgroundColor: '#3498db', color: 'white', border: 'none', cursor: 'pointer' }} onClick={() => navigate('/login')}>Go to Login</button>
+        </div>
+      </div>
+    );
+  }
+
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === 'image') {
@@ -87,12 +100,10 @@ function Sell({ user }) {
       <h2>Sell a New Product</h2>
       {/* Remove login check, always show form */}
       <>
-        {user && (
-          <div style={{ marginBottom: '20px' }}>
-            <span style={{ marginRight: '10px' }}>Welcome <b>{user.email || user.username}</b></span>
-            <button className="deleteButton" style={styles.deleteButton} onClick={handleLogout}>Logout</button>
-          </div>
-        )}
+        <div style={{ marginBottom: '20px' }}>
+          <span style={{ marginRight: '10px' }}>Welcome <b>{user.email || user.username}</b></span>
+          <button className="deleteButton" style={styles.deleteButton} onClick={handleLogout}>Logout</button>
+        </div>
         <form onSubmit={handleSubmit} style={styles.form}>
           <input name="name" placeholder="Product Name" value={formData.name} onChange={handleChange} style={styles.input} required />
           <input name="price" placeholder="Price" value={formData.price} onChange={handleChange} style={styles.input} required />
