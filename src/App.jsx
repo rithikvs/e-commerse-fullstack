@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import About from './pages/About';
 import Contact from './pages/Contact';
@@ -13,8 +13,24 @@ import AdminLogin from './pages/AdminLogin';
 // Create a separate component for the app content
 function AppContent() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Always start with null user (force login on reload)
   const [cartItems, setCartItems] = useState([]);
-  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('currentUser')) || null);
+  const [user, setUser] = useState(null);
+
+  // On mount, clear any previous session if not on /login or /admin/login
+  useEffect(() => {
+    const allowed = ['/login', '/admin/login'];
+    if (!allowed.includes(location.pathname)) {
+      localStorage.removeItem('currentUser');
+      setUser(null);
+      setCartItems([]);
+      // If not already on login, redirect to login
+      if (location.pathname !== '/login') {
+        navigate('/login', { replace: true });
+      }
+    }
+  }, []); // Only run on mount
 
   // Fetch cart from MongoDB when user logs in
   useEffect(() => {
