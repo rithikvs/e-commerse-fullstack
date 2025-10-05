@@ -36,6 +36,57 @@ function Payment({ cartItems: propCartItems }) {
     setCardDetails(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  // Background sync for any queued orders
+  useEffect(() => {
+    const syncPendingOrders = async () => {
+      const pending = JSON.parse(localStorage.getItem('pendingOrders') || '[]');
+      if (!pending.length) return;
+      const remaining = [];
+      for (const order of pending) {
+        const ok = await saveOrderWithRetry(order, 3);
+        if (!ok) remaining.push(order);
+      }
+      localStorage.setItem('pendingOrders', JSON.stringify(remaining));
+    };
+
+    // run immediately then every 60s
+    syncPendingOrders();
+    const interval = setInterval(syncPendingOrders, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Helper: retry POST to /api/orders
+  const saveOrderWithRetry = async (orderPayload, retries = 3) => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const orderResponse = await fetch('http://localhost:5000/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderPayload)
+        });
+        if (orderResponse.ok) {
+          console.log('Order saved on attempt', attempt);
+          return true;
+        } else {
+          const text = await orderResponse.text();
+          console.error(`Order save failed (attempt ${attempt})`, orderResponse.status, text);
+        }
+      } catch (err) {
+        console.error(`Network error saving order (attempt ${attempt}):`, err);
+      }
+      // Exponential backoff
+      await new Promise(res => setTimeout(res, 500 * attempt));
+    }
+    return false;
+  };
+
+  const queueOrderForLater = (orderPayload) => {
+    const pending = JSON.parse(localStorage.getItem('pendingOrders') || '[]');
+    pending.push({ ...orderPayload, queuedAt: new Date().toISOString() });
+    localStorage.setItem('pendingOrders', JSON.stringify(pending));
+    console.warn('Order queued for later sync (pendingOrders updated).');
+  };
+
   const processOrder = async () => {
     setOrderProcessing(true);
     try {
@@ -74,6 +125,44 @@ function Payment({ cartItems: propCartItems }) {
         }
       }
 
+      // Save order to database
+      const orderItems = cartItems.map(item => ({
+        productId: item._id || item.productId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity || 1,
+        material: item.material
+      }));
+
+      // Get shipping details from form
+      const shippingDetails = {
+        fullName: document.querySelector('input[placeholder="Enter your full name"]').value,
+        email: document.querySelector('input[placeholder="Enter your email"]').value,
+        address: document.querySelector('input[placeholder="Enter your address"]').value,
+        city: document.querySelector('input[placeholder="Enter city"]').value,
+        postalCode: document.querySelector('input[placeholder="Enter postal code"]').value
+      };
+
+      const orderPayload = {
+        userEmail: user?.email || shippingDetails.email,
+        items: orderItems,
+        totalAmount: totalAmount,
+        shippingDetails,
+        paymentMethod: paymentMethod,
+        paymentStatus: paymentMethod === 'Cash on Delivery' ? 'pending' : 'completed',
+        orderStatus: 'placed'
+      };
+
+      // Attempt to save order with retries
+      const saved = await saveOrderWithRetry(orderPayload, 3);
+      if (!saved) {
+        // If save ultimately fails, queue for automatic background retry
+        queueOrderForLater(orderPayload);
+        alert('Order placed successfully, but saving to the server failed. The app has queued the order and will retry automatically.');
+      } else {
+        alert('Order placed successfully!');
+      }
+
       // Clear purchased items from cart
       if (user?.email) {
         try {
@@ -106,7 +195,6 @@ function Payment({ cartItems: propCartItems }) {
         }
       }
 
-      alert('Order placed successfully!');
       navigate('/');
     } catch (err) {
       alert(err.message || 'Error processing order');
