@@ -1,6 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -223,8 +225,32 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler (Express 5 safe - no wildcard path)
+// Serve frontend build (if present) and fallback to index.html for SPA routes.
+// This must come AFTER API routes so /api/* is handled by the API.
+const DIST_DIR = path.resolve(__dirname, '..', 'dist');
+if (fs.existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR, { index: false }));
+
+  // For any GET that doesn't start with /api, serve index.html (SPA fallback)
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next(); // let API routes handle /api/* (including 404 JSON)
+    const indexHtml = path.join(DIST_DIR, 'index.html');
+    if (fs.existsSync(indexHtml)) {
+      return res.sendFile(indexHtml);
+    }
+    next();
+  });
+}
+
+// 404 handler for API and other missing resources
 app.use((req, res) => {
+  // If request expects HTML and frontend is present, serve index.html as a last resort
+  const accept = req.headers.accept || '';
+  if (accept.includes('text/html') && fs.existsSync(path.join(DIST_DIR, 'index.html')) && !req.path.startsWith('/api')) {
+    return res.sendFile(path.join(DIST_DIR, 'index.html'));
+  }
+
+  // Default JSON 404 for API or when frontend not available
   res.status(404).json({ message: 'Route not found' });
 });
 
