@@ -1,16 +1,24 @@
 const express = require('express');
 const router = express.Router();
+<<<<<<< HEAD
+=======
+const mongoose = require('mongoose'); // added
+>>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 const Product = require('../models/Product');
 const Cart = require('../models/Cart');
+<<<<<<< HEAD
 const dataStore = require('../dataStore');
+=======
+>>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
 
 // Admin login using database credentials
 const ADMIN_KEY = process.env.ADMIN_KEY || 'local-admin-key';
 router.post('/admin/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+<<<<<<< HEAD
     // If DB connected, use real Admin model
     if (req.app.locals.dbConnected) {
       const admin = await Admin.findOne({ email });
@@ -31,12 +39,41 @@ router.post('/admin/login', async (req, res) => {
     if (!admin || admin.password !== password) {
       return res.status(401).json({ message: 'Invalid admin credentials (fallback)' });
     }
+=======
+
+    // If DB not connected, allow fallback to ENV admin credentials
+    if (mongoose.connection.readyState !== 1) {
+      const envEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+      const envPass = process.env.ADMIN_PASSWORD || 'admin123';
+      if (email === envEmail && password === envPass) {
+        return res.json({
+          email: envEmail,
+          username: 'admin',
+          role: 'admin',
+          adminKey: ADMIN_KEY,
+          _id: null
+        });
+      }
+      return res.status(503).json({ message: 'Database unavailable and credentials did not match fallback admin' });
+    }
+
+    // DB is connected — proceed with normal DB lookup
+    const admin = await Admin.findOne({ email });
+    if (!admin || admin.password !== password) {
+      return res.status(401).json({ message: 'Invalid admin credentials' });
+    }
+
+>>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
     res.json({
       email: admin.email,
       username: admin.username,
       role: 'admin',
       adminKey: ADMIN_KEY,
+<<<<<<< HEAD
       _id: admin._id || null
+=======
+      _id: admin._id
+>>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -46,6 +83,7 @@ router.post('/admin/login', async (req, res) => {
 // User login (simplified - no roles)
 router.post('/login', async (req, res) => {
   try {
+<<<<<<< HEAD
     if (req.app.locals.dbConnected) {
       const user = await User.findOne({
         email: req.body.email,
@@ -66,6 +104,18 @@ router.post('/login', async (req, res) => {
       email: user.email,
       username: user.username,
       _id: user._id || null
+=======
+    const user = await User.findOne({
+      email: req.body.email,
+      password: req.body.password
+    });
+    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+
+    res.json({
+      email: user.email,
+      username: user.username,
+      _id: user._id
+>>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -75,6 +125,7 @@ router.post('/login', async (req, res) => {
 // Register user (no role needed)
 router.post('/register', async (req, res) => {
   try {
+<<<<<<< HEAD
     if (req.app.locals.dbConnected) {
       const exists = await User.findOne({ email: req.body.email });
       if (exists) return res.status(400).json({ message: 'User exists' });
@@ -98,6 +149,18 @@ router.post('/register', async (req, res) => {
     };
     await dataStore.addUser(newUser);
     res.json({ message: 'Registered (fallback)', user: newUser });
+=======
+    const exists = await User.findOne({ email: req.body.email });
+    if (exists) return res.status(400).json({ message: 'User exists' });
+
+    const user = new User({
+      username: req.body.username,
+      email: req.body.email,
+      password: req.body.password
+    });
+    await user.save();
+    res.json({ message: 'Registered', user });
+>>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -156,6 +219,7 @@ router.get('/sync/all', async (req, res) => {
     if (!adminKey || adminKey !== ADMIN_KEY) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
+<<<<<<< HEAD
     if (req.app.locals.dbConnected) {
       const [users, admins, products, carts] = await Promise.all([
         User.find({}).lean(),
@@ -174,6 +238,30 @@ router.get('/sync/all', async (req, res) => {
       dataStore.getCarts()
     ]);
     return res.json({ users, admins, products, carts, timestamp: new Date(), fallback: true });
+=======
+
+    const [users, admins, products, carts] = await Promise.all([
+      User.find({}).lean(),
+      Admin.find({}).lean(),
+      Product.find({}).lean(),
+      Cart.find({}).lean()
+    ]);
+
+    console.log('Sync data counts:', {
+      users: users.length,
+      admins: admins.length,
+      products: products.length,
+      carts: carts.length
+    });
+
+    res.json({
+      users,
+      admins,
+      products,
+      carts,
+      timestamp: new Date()
+    });
+>>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
   } catch (error) {
     console.error('Sync data error:', error);
     res.status(500).json({ message: 'Error syncing data' });
@@ -204,6 +292,7 @@ router.get('/db-stats', async (req, res) => {
     if (key !== ADMIN_KEY) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
+<<<<<<< HEAD
     if (req.app.locals.dbConnected) {
       const dbStats = {
         users: await User.countDocuments(),
@@ -223,6 +312,17 @@ router.get('/db-stats', async (req, res) => {
       lastSync: new Date(),
       fallback: true
     };
+=======
+
+    const dbStats = {
+      users: await User.countDocuments(),
+      admins: await Admin.countDocuments(),
+      products: await Product.countDocuments(),
+      carts: await Cart.countDocuments(),
+      lastSync: new Date()
+    };
+
+>>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
     res.json(dbStats);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching database stats', error: error.message });
@@ -236,6 +336,7 @@ router.get('/generate-report', async (req, res) => {
     if (!adminKey || adminKey !== ADMIN_KEY) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
+<<<<<<< HEAD
     let users, admins, products, carts;
     if (req.app.locals.dbConnected) {
       [users, admins, products, carts] = await Promise.all([
@@ -262,13 +363,38 @@ router.get('/generate-report', async (req, res) => {
       pendingProducts: (products || []).filter(p => p.status === 'pending').length,
       totalOrders: (carts || []).reduce((sum, cart) => sum + (cart.items?.length || 0), 0),
       averageRating: (products || []).reduce((sum, p) => sum + (p.rating || 0), 0) / ((products || []).length || 1)
+=======
+
+    // Gather detailed stats
+    const [users, admins, products, carts] = await Promise.all([
+      User.find({}).lean(),
+      Admin.find({}).lean(),
+      Product.find({}).lean(),
+      Cart.find({}).lean()
+    ]);
+
+    // Calculate additional metrics
+    const reportData = {
+      totalUsers: users.length,
+      totalAdmins: admins.length,
+      totalProducts: products.length,
+      totalCarts: carts.length,
+      activeProducts: products.filter(p => p.inStock).length,
+      pendingProducts: products.filter(p => p.status === 'pending').length,
+      totalOrders: carts.reduce((sum, cart) => sum + (cart.items?.length || 0), 0),
+      averageRating: products.reduce((sum, p) => sum + (p.rating || 0), 0) / (products.length || 1)
+>>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
     };
 
     res.json({
       report: reportData,
       timestamp: new Date(),
+<<<<<<< HEAD
       success: true,
       fallback: req.app.locals.dbConnected ? false : true
+=======
+      success: true
+>>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
     });
   } catch (error) {
     console.error('Report generation error:', error);
