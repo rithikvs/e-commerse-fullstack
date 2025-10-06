@@ -1,4 +1,3 @@
-
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -9,85 +8,108 @@ app.use(cors({ origin: true, credentials: true, allowedHeaders: ['Content-Type',
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// MongoDB connection with fallback and better error handling
+// Require Admin model early so routes can reference it even if connect attempt delayed
+const Admin = require('./models/Admin');
+
+// MongoDB connection with retry/backoff and better error handling
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/handmade_crafts';
+const MONGO_RETRY_ATTEMPTS = Number(process.env.MONGO_RETRY_ATTEMPTS) || 5;
+const MONGO_RETRY_DELAY_MS = Number(process.env.MONGO_RETRY_DELAY_MS) || 2000;
 
 console.log('🔗 Attempting to connect to MongoDB...');
 console.log('📡 Connection string:', MONGO_URI);
 
-mongoose.connect(MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
-})
-.then(async () => {
-  console.log('✅ Connected to MongoDB successfully');
-  console.log('🗄️  Database:', mongoose.connection.name);
-  console.log('📱 Host:', mongoose.connection.host);
-  console.log('🔌 Port:', mongoose.connection.port);
+let connectedOnce = false;
 
-  // Seed default admin
+async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = MONGO_RETRY_DELAY_MS) {
   try {
-    const Admin = require('./models/Admin');
-    const adminCount = await Admin.countDocuments();
-    if (adminCount === 0) {
-      const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
-      const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-      await Admin.create({ username: 'admin', email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
-      console.log(`👑 Seeded default admin user: ${ADMIN_EMAIL}`);
-    }
-  } catch (seedErr) {
-    console.error('Admin seed error:', seedErr);
-  }
+    // Note: avoid deprecated options; modern drivers don't need useNewUrlParser/useUnifiedTopology
+    await mongoose.connect(MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      // Allow insecure TLS for development if explicitly requested via env (NOT recommended for prod)
+      ...(process.env.MONGO_INSECURE === 'true' ? { tlsAllowInvalidCertificates: true } : {})
+    });
 
-  // Seed demo products
-  try {
-    const Product = require('./models/Product');
-    const demoProducts = [
-      { name: 'Handwoven Basket', price: '₹499', material: 'Natural Jute', rating: 4.5, image: 'download.jpeg', stock: 10 },
-      { name: 'Clay Pot', price: '₹299', material: 'clay', rating: 4.2, image: 'clay pot.jpeg', stock: 12 },
-      { name: 'Jewelry Box', price: '₹799', material: 'Wooden', rating: 4.8, image: 'jwellery.jpeg', stock: 8 },
-      { name: 'Bamboo Lamp', price: '₹1299', material: 'Bamboo', rating: 4.6, image: 'bamboo.jpeg', stock: 5 },
-      { name: 'Coffee Cup', price: '₹199', material: 'ceramic', rating: 4.1, image: 'coffee.jpeg', stock: 20 }
-    ];
+    connectedOnce = true;
+    app.locals.dbConnected = true;
+    console.log('✅ Connected to MongoDB successfully');
+    console.log('🗄️  Database:', mongoose.connection.name);
+    console.log('📱 Host:', mongoose.connection.host);
+    console.log('🔌 Port:', mongoose.connection.port);
 
-    for (const dp of demoProducts) {
-      const exists = await Product.findOne({ name: dp.name, owner: 'system' });
-      if (!exists) {
-        await Product.create({ ...dp, owner: 'system' });
-        console.log(`🧩 Seeded demo product: ${dp.name}`);
+    // Seed default admin (only after successful connection)
+    try {
+      const adminCount = await Admin.countDocuments();
+      if (adminCount === 0) {
+        const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
+        const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+        await Admin.create({ username: 'admin', email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
+        console.log(`👑 Seeded default admin user: ${ADMIN_EMAIL}`);
       }
+    } catch (seedErr) {
+      console.error('Admin seed error:', seedErr);
     }
-  } catch (prodSeedErr) {
-    console.error('Product seed error:', prodSeedErr);
+
+    // Seed demo products only after successful connection
+    try {
+      const Product = require('./models/Product');
+      const demoProducts = [
+        { name: 'Handwoven Basket', price: '₹499', material: 'Natural Jute', rating: 4.5, image: 'download.jpeg', stock: 10 },
+        { name: 'Clay Pot', price: '₹299', material: 'clay', rating: 4.2, image: 'clay pot.jpeg', stock: 12 },
+        { name: 'Jewelry Box', price: '₹799', material: 'Wooden', rating: 4.8, image: 'jwellery.jpeg', stock: 8 },
+        { name: 'Bamboo Lamp', price: '₹1299', material: 'Bamboo', rating: 4.6, image: 'bamboo.jpeg', stock: 5 },
+        { name: 'Coffee Cup', price: '₹199', material: 'ceramic', rating: 4.1, image: 'coffee.jpeg', stock: 20 }
+      ];
+
+      for (const dp of demoProducts) {
+        const exists = await Product.findOne({ name: dp.name, owner: 'system' });
+        if (!exists) {
+          await Product.create({ ...dp, owner: 'system' });
+          console.log(`🧩 Seeded demo product: ${dp.name}`);
+        }
+      }
+    } catch (prodSeedErr) {
+      console.error('Product seed error:', prodSeedErr);
+    }
+
+  } catch (err) {
+    app.locals.dbConnected = false;
+    console.error(`❌ MongoDB connection attempt failed: ${err && err.message ? err.message : err}`);
+    if (attemptsLeft > 0) {
+      console.log(`⏳ Retrying MongoDB connection in ${delayMs}ms (${attemptsLeft - 1} attempts left)...`);
+      await new Promise(res => setTimeout(res, delayMs));
+      return connectWithRetry(attemptsLeft - 1, Math.min(delayMs * 2, 60000));
+    }
+
+    // Final failure after retries
+    console.error('❌ MongoDB connection error: all retry attempts exhausted.');
+    console.warn('⚠️ The API will continue running but database-dependent features will be limited.');
+    console.warn('ℹ️ Common fixes:');
+    console.warn('- Ensure your Atlas IP whitelist includes this host.');
+    console.warn('- Check your MONGO_URI and credentials.');
+    console.warn('- For development, set MONGO_INSECURE=true (not recommended for production).');
+    // do not throw — allow server to stay up (fallback endpoints may operate in limited mode)
   }
-})
-.catch((err) => {
-  console.error('❌ MongoDB connection error:', err.message);
-  console.log('⚠️  Make sure MongoDB is running on your system');
-  console.log('💡 You can install MongoDB locally or use MongoDB Atlas');
-  console.log('📋 Local installation steps:');
-  console.log('   1. Download MongoDB from https://www.mongodb.com/try/download/community');
-  console.log('   2. Install and start MongoDB service');
-  console.log('   3. Or use: mongod --dbpath /path/to/data/db');
-  console.log('🌐 Or use MongoDB Atlas (cloud):');
-  console.log('   1. Go to https://www.mongodb.com/atlas');
-  console.log('   2. Create free cluster');
-  console.log('   3. Get connection string and update .env file');
-});
+}
+
+// Start connection attempts (don't block rest of startup)
+connectWithRetry();
 
 // Handle MongoDB connection events
 mongoose.connection.on('error', (err) => {
-  console.error('❌ MongoDB connection error:', err);
+  console.error('❌ MongoDB connection error event:', err && err.message ? err.message : err);
+  app.locals.dbConnected = false;
 });
 
 mongoose.connection.on('disconnected', () => {
   console.log('🔌 MongoDB disconnected');
+  app.locals.dbConnected = false;
 });
 
 mongoose.connection.on('reconnected', () => {
   console.log('🔄 MongoDB reconnected');
+  app.locals.dbConnected = true;
 });
 
 // Routes
@@ -105,14 +127,18 @@ app.use('/api/orders', orderRoutes);
 const User = require('./models/User');
 const ADMIN_KEY = process.env.ADMIN_KEY || 'local-admin-key';
 
-// Fallback admin login route
+// Fallback admin login route (Admin is required above)
 app.post('/api/admin/login', async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ message: 'Email and password required' });
+    // If DB is not connected, respond with helpful message
+    if (!app.locals.dbConnected) {
+      return res.status(503).json({ message: 'Database unavailable. Admin login not possible at this time.' });
+    }
     const admin = await Admin.findOne({ email, password });
     if (!admin) return res.status(401).json({ message: 'Unauthorized' });
-    res.json({ adminKey: ADMIN_KEY, admin });
+    res.json({ adminKey: ADMIN_KEY, admin: { email: admin.email, username: admin.username, _id: admin._id } });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -122,16 +148,19 @@ app.get('/api/users/all', async (req, res) => {
   try {
     const key = req.headers['x-admin-key'];
     if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
+    if (!app.locals.dbConnected) return res.status(503).json({ message: 'Database unavailable' });
     const users = await User.find({});
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
+
 app.delete('/api/users/:email', async (req, res) => {
   try {
     const key = req.headers['x-admin-key'];
     if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
+    if (!app.locals.dbConnected) return res.status(503).json({ message: 'Database unavailable' });
     await User.deleteOne({ email: req.params.email });
     res.json({ message: 'User deleted' });
   } catch (err) {
