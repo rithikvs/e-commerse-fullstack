@@ -21,14 +21,16 @@ console.log('📡 Connection string:', MONGO_URI);
 
 let connectedOnce = false;
 
-async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = MONGO_RETRY_DELAY_MS) {
+async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = MONGO_RETRY_DELAY_MS, insecure = false) {
   try {
     // Note: avoid deprecated options; modern drivers don't need useNewUrlParser/useUnifiedTopology
     await mongoose.connect(MONGO_URI, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
-      // Allow insecure TLS for development if explicitly requested via env (NOT recommended for prod)
-      ...(process.env.MONGO_INSECURE === 'true' ? { tlsAllowInvalidCertificates: true } : {})
+      // If this connection attempt is marked insecure, allow invalid certs
+      ...(insecure ? { tlsAllowInvalidCertificates: true } : {}),
+      // Also respect explicit env toggle
+      ...(process.env.MONGO_INSECURE === 'true' && !insecure ? { tlsAllowInvalidCertificates: true } : {})
     });
 
     connectedOnce = true;
@@ -76,10 +78,19 @@ async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = M
   } catch (err) {
     app.locals.dbConnected = false;
     console.error(`❌ MongoDB connection attempt failed: ${err && err.message ? err.message : err}`);
+
+    // If we see TLS/SSL related errors, try one immediate retry with insecure TLS (allow invalid certs).
+    const isTlsError = err && err.message && /SSL|TLS|tls1_alert|tlsv1/i.test(err.message);
+    if (isTlsError && !insecure) {
+      console.warn('⚠️  TLS/SSL error detected while connecting to MongoDB. Retrying once with tlsAllowInvalidCertificates=true (insecure).');
+      // try insecure retry immediately (do not reduce attemptsLeft for this forced insecure path)
+      return connectWithRetry(attemptsLeft, delayMs, true);
+    }
+
     if (attemptsLeft > 0) {
       console.log(`⏳ Retrying MongoDB connection in ${delayMs}ms (${attemptsLeft - 1} attempts left)...`);
       await new Promise(res => setTimeout(res, delayMs));
-      return connectWithRetry(attemptsLeft - 1, Math.min(delayMs * 2, 60000));
+      return connectWithRetry(attemptsLeft - 1, Math.min(delayMs * 2, 60000), insecure);
     }
 
     // Final failure after retries
