@@ -14,12 +14,29 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const Admin = require('./models/Admin');
 
 // MongoDB connection with retry/backoff and better error handling
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/handmade_crafts';
+// Allow MONGO_URI to be provided as an Atlas SRV string without a DB name.
+// If missing, append a safe default DB name so mongoose selects the right DB.
+let MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/handmade_crafts';
+// Allow overriding only the database name via env to force the correct DB
+const MONGO_DBNAME = process.env.MONGO_DBNAME || 'handmade_crafts';
 const MONGO_RETRY_ATTEMPTS = Number(process.env.MONGO_RETRY_ATTEMPTS) || 5;
 const MONGO_RETRY_DELAY_MS = Number(process.env.MONGO_RETRY_DELAY_MS) || 2000;
 
+// If user provided a URI without an explicit database, append a default DB name.
+// Matches: any '/' followed by non-slash chars before optional query or end.
+try {
+  const uriHasDb = /\/[^\/\s]+(\?|$)/.test(MONGO_URI);
+  if (!uriHasDb) {
+    MONGO_URI = MONGO_URI.replace(/\/?$/, `/${'handmade_crafts'}`);
+    console.log('ℹ️ MONGO_URI did not contain a database name. Appended default DB: handmade_crafts');
+  }
+} catch (e) {
+  console.warn('Could not normalize MONGO_URI:', e && e.message ? e.message : e);
+}
+
 console.log('🔗 Attempting to connect to MongoDB...');
 console.log('📡 Connection string:', MONGO_URI);
+console.log('ℹ️ Tip: On Render set the environment variable MONGO_URI to the full connection string.\n  - For MongoDB Atlas SRV URIs include the DB name (e.g. mongodb+srv://user:pass@cluster0.mongodb.net/handmade_crafts).\n  - URL-encode special characters in your password.\n  - Ensure Atlas Network Access (IP Access List) allows connections from Render.');
 
 let connectedOnce = false;
 
@@ -29,6 +46,7 @@ async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = M
     await mongoose.connect(MONGO_URI, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
+      dbName: MONGO_DBNAME,
       // Allow insecure TLS for development if explicitly requested via env (NOT recommended for prod)
       ...(process.env.MONGO_INSECURE === 'true' ? { tlsAllowInvalidCertificates: true } : {})
     });
@@ -36,7 +54,8 @@ async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = M
     connectedOnce = true;
     app.locals.dbConnected = true;
     console.log('✅ Connected to MongoDB successfully');
-    console.log('🗄️  Database:', mongoose.connection.name);
+  console.log('🗄️  Database:', mongoose.connection.name);
+  console.log(`ℹ️ Using dbName option (from MONGO_DBNAME or default): ${MONGO_DBNAME}`);
     console.log('📱 Host:', mongoose.connection.host);
     console.log('🔌 Port:', mongoose.connection.port);
 
