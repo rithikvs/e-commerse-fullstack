@@ -1,15 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
+const dataStore = require('../dataStore');
 
 const ADMIN_KEY = process.env.ADMIN_KEY || 'local-admin-key';
 
 // Create new order
 router.post('/', async (req, res) => {
   try {
-    const order = new Order(req.body);
-    await order.save();
-    res.status(201).json(order);
+    if (req.app.locals.dbConnected) {
+      const order = new Order(req.body);
+      await order.save();
+      return res.status(201).json(order);
+    }
+    // fallback: file-store
+    const created = await dataStore.addOrder({ ...req.body, createdAt: new Date().toISOString(), _id: `order_${Date.now()}` });
+    res.status(201).json(created);
   } catch (error) {
     res.status(500).json({ message: 'Error creating order', error: error.message });
   }
@@ -18,9 +24,13 @@ router.post('/', async (req, res) => {
 // Get user's orders
 router.get('/user/:email', async (req, res) => {
   try {
-    const orders = await Order.find({ userEmail: req.params.email })
-      .sort({ createdAt: -1 });
-    res.json(orders);
+    if (req.app.locals.dbConnected) {
+      const orders = await Order.find({ userEmail: req.params.email }).sort({ createdAt: -1 });
+      return res.json(orders);
+    }
+    const orders = await dataStore.getOrders();
+    const filtered = (orders || []).filter(o => o.userEmail === req.params.email).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json(filtered);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching orders', error: error.message });
   }
@@ -32,8 +42,12 @@ router.get('/all', async (req, res) => {
     const key = req.headers['x-admin-key'];
     if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
 
-    const orders = await Order.find({}).sort({ createdAt: -1 });
-    res.json(orders);
+    if (req.app.locals.dbConnected) {
+      const orders = await Order.find({}).sort({ createdAt: -1 });
+      return res.json(orders);
+    }
+    const orders = await dataStore.getOrders();
+    res.json((orders || []).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)));
   } catch (error) {
     console.error('Error fetching all orders:', error);
     res.status(500).json({ message: 'Error fetching orders', error: error.message });
@@ -46,7 +60,9 @@ router.get('/export', async (req, res) => {
     const key = req.headers['x-admin-key'];
     if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
 
-    const orders = await Order.find({}).sort({ createdAt: -1 }).lean();
+    const orders = req.app.locals.dbConnected
+      ? await Order.find({}).sort({ createdAt: -1 }).lean()
+      : await dataStore.getOrders();
 
     // CSV header
     const headers = [
