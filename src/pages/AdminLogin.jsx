@@ -37,6 +37,14 @@ function AdminLogin() {
         data = await doLogin('http://localhost:5000/api/admin/login');
       }
       localStorage.setItem('adminKey', data.adminKey);
+      // Mark currentUser as admin so the SPA UI switches to admin-only mode
+      const adminUser = {
+        email: data.email || (data.admin && data.admin.email) || '',
+        username: data.username || (data.admin && data.admin.username) || 'admin',
+        isAdmin: true,
+        adminKey: data.adminKey
+      };
+      localStorage.setItem('currentUser', JSON.stringify(adminUser));
       navigate('/admin');
     } catch (err) {
       setError(err.message || 'Login failed');

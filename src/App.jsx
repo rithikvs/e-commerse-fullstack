@@ -63,11 +63,18 @@ function AppContent() {
 
   // Add to cart but require authentication; redirect to login otherwise.
   const addToCart = (product) => {
+    // Admins are not allowed to perform buyer actions
+    if (user?.isAdmin) {
+      alert('Admin accounts cannot purchase items from the storefront. Please use the Admin Panel.');
+      navigate('/admin');
+      return;
+    }
     if (!user || !user.email) {
       alert('Please login to add items to your cart.');
       navigate('/login');
       return;
     }
+
     // Find if product already exists in cart (by productId, _id, or id)
     const productId = product._id || product.id;
     const existingIndex = cartItems.findIndex(
@@ -146,62 +153,72 @@ function AppContent() {
         <h1>Handmade Crafts</h1>
       </header>
       <nav style={styles.navbar}>
-        <Link to="/" className="nav-link" style={styles.navLink}>Home</Link>
-        <Link to="/about" className="nav-link" style={styles.navLink}>About</Link>
-        <Link to="/contact" className="nav-link" style={styles.navLink}>Contact</Link>
-        <Link to="/cart" className="nav-link" style={styles.navLink}>Cart ({cartItems.length})</Link>
-        <Link to="/sell" className="nav-link" style={styles.navLink}>Sell</Link>
+        {/* For normal users show full nav */}
+        {!isAdmin && (
+          <>
+            <Link to="/" className="nav-link" style={styles.navLink}>Home</Link>
+            <Link to="/about" className="nav-link" style={styles.navLink}>About</Link>
+            <Link to="/contact" className="nav-link" style={styles.navLink}>Contact</Link>
+            <Link to="/cart" className="nav-link" style={styles.navLink}>Cart ({cartItems.length})</Link>
+            <Link to="/sell" className="nav-link" style={styles.navLink}>Sell</Link>
+          </>
+        )}
+
         {isAuthenticated ? (
           <>
+            {/* Admins see only a label; no direct Admin Panel link in nav */}
             {!isAdmin && <span className="nav-link" style={styles.navLink}>Welcome, {user.username}</span>}
-            {isAdmin && <Link to="/admin" className="nav-link" style={styles.navLink}>Admin Panel</Link>}
+            {isAdmin && <span className="nav-link" style={styles.navLink}>Admin: {user.username}</span>}
             <span className="nav-link" style={styles.navLink} onClick={handleLogout}>Logout</span>
           </>
         ) : (
-          <>
-            <Link to="/login" className="nav-link" style={styles.navLink}>Login / Register</Link>
-          </>
+          <Link to="/login" className="nav-link" style={styles.navLink}>Login / Register</Link>
         )}
       </nav>
 
       {/* Routes */}
       <Routes>
-        {/* Public pages */}
-        <Route path="/login" element={
-          isAuthenticated ? 
-            (isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/" replace />) 
-            : <LoginRegister onLogin={handleLogin} />
-        } />
-        
-        <Route path="/" element={<Home addToCart={addToCart} user={user} />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/contact" element={<Contact />} />
-        
-        {/* Protected routes (actions) */}
-        {/* Admin routes */}
-        <Route path="/admin" element={
-          <ProtectedAdminRoute>
-            <AdminPanel />
-          </ProtectedAdminRoute>
-        } />
-        
-        <Route path="/cart" element={
-          <ProtectedRoute>
-            <Cart cartItems={cartItems} removeFromCart={removeFromCart} />
-          </ProtectedRoute>
-        } />
-        <Route path="/payment" element={
-          <ProtectedRoute>
-            <Payment cartItems={cartItems} />
-          </ProtectedRoute>
-        } />
-        <Route path="/sell" element={
-          <ProtectedRoute>
-            <Sell user={user} />
-          </ProtectedRoute>
-        } />
-         
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {isAdmin ? (
+          // Admin-only routes when an admin is signed in
+          <>
+            <Route path="/admin" element={
+              <ProtectedAdminRoute>
+                <AdminPanel />
+              </ProtectedAdminRoute>
+            } />
+            <Route path="/login" element={<LoginRegister onLogin={handleLogin} />} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </>
+        ) : (
+          // Normal visitor / user routes
+          <>
+            <Route path="/login" element={
+              isAuthenticated ? <Navigate to="/" replace /> : <LoginRegister onLogin={handleLogin} />
+            } />
+            <Route path="/" element={<Home addToCart={addToCart} user={user} />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+
+            <Route path="/cart" element={
+              <ProtectedRoute>
+                <Cart cartItems={cartItems} removeFromCart={removeFromCart} />
+              </ProtectedRoute>
+            } />
+            <Route path="/payment" element={
+              <ProtectedRoute>
+                <Payment cartItems={cartItems} />
+              </ProtectedRoute>
+            } />
+            <Route path="/sell" element={
+              <ProtectedRoute>
+                <Sell user={user} />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/admin" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
+        )}
       </Routes>
     </div>
   );

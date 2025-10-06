@@ -50,6 +50,13 @@ function Home({ addToCart }) {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('currentUser'));
 
+  // If current user is an admin, redirect to admin panel
+  useEffect(() => {
+    if (user?.isAdmin) {
+      navigate('/admin', { replace: true });
+    }
+  }, [user, navigate]);
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -148,6 +155,11 @@ function Home({ addToCart }) {
                     className="buyButton"
                     style={{...styles.buyButton, transform: 'none', transition: 'none', boxShadow: 'none', opacity: isOut ? 0.5 : 1, pointerEvents: isOut ? 'none' : 'auto'}}
                     onClick={() => {
+                      if (user?.isAdmin) {
+                        alert('Admin accounts cannot perform purchases. Use the Admin Panel.');
+                        navigate('/admin');
+                        return;
+                      }
                       if (!user || !user.email) {
                         alert('Please login to purchase items.');
                         navigate('/login');
