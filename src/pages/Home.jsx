@@ -122,7 +122,7 @@ function Home({ addToCart }) {
 
   return (
     <div style={styles.container}>
-      <h2 style={styles.heading}>Our Handmade Productsssssssssss</h2>
+      <h2 style={styles.heading}>Our Handmade Products</h2>
       <div className="grid" style={styles.grid}>
         {allProducts.map((product, index) => {
           const isOut = Number(product.stock) <= 0 || product.inStock === false;
