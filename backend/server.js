@@ -1,11 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-<<<<<<< HEAD
-=======
 const path = require('path');
 const fs = require('fs');
->>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
 require('dotenv').config();
 
 const app = express();
@@ -13,37 +10,23 @@ app.use(cors({ origin: true, credentials: true, allowedHeaders: ['Content-Type',
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+
 // Require Admin model early so routes can reference it even if connect attempt delayed
 const Admin = require('./models/Admin');
 
 // MongoDB connection with retry/backoff and better error handling
-<<<<<<< HEAD
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/handmade_crafts';
-const MONGO_RETRY_ATTEMPTS = Number(process.env.MONGO_RETRY_ATTEMPTS) || 5;
-const MONGO_RETRY_DELAY_MS = Number(process.env.MONGO_RETRY_DELAY_MS) || 2000;
-
-console.log('🔗 Attempting to connect to MongoDB...');
-console.log('📡 Connection string:', MONGO_URI);
-
-let connectedOnce = false;
-
-async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = MONGO_RETRY_DELAY_MS, insecure = false) {
-=======
-// Allow MONGO_URI to be provided as an Atlas SRV string without a DB name.
-// If missing, append a safe default DB name so mongoose selects the right DB.
-let MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/handmade_crafts';
-// Allow overriding only the database name via env to force the correct DB
+// Support both MONGO_URI and MONGODB_URI env names (some users/hosts use one or the other)
+let MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/handmade_crafts';
 const MONGO_DBNAME = process.env.MONGO_DBNAME || 'handmade_crafts';
 const MONGO_RETRY_ATTEMPTS = Number(process.env.MONGO_RETRY_ATTEMPTS) || 5;
 const MONGO_RETRY_DELAY_MS = Number(process.env.MONGO_RETRY_DELAY_MS) || 2000;
 
 // If user provided a URI without an explicit database, append a default DB name.
-// Matches: any '/' followed by non-slash chars before optional query or end.
 try {
   const uriHasDb = /\/[^\/\s]+(\?|$)/.test(MONGO_URI);
   if (!uriHasDb) {
-    MONGO_URI = MONGO_URI.replace(/\/?$/, `/${'handmade_crafts'}`);
-    console.log('ℹ️ MONGO_URI did not contain a database name. Appended default DB: handmade_crafts');
+    MONGO_URI = MONGO_URI.replace(/\/?$/, `/${MONGO_DBNAME}`);
+    console.log('ℹ️ MONGO_URI did not contain a database name. Appended default DB:', MONGO_DBNAME);
   }
 } catch (e) {
   console.warn('Could not normalize MONGO_URI:', e && e.message ? e.message : e);
@@ -51,38 +34,26 @@ try {
 
 console.log('🔗 Attempting to connect to MongoDB...');
 console.log('📡 Connection string:', MONGO_URI);
-console.log('ℹ️ Tip: On Render set the environment variable MONGO_URI to the full connection string.\n  - For MongoDB Atlas SRV URIs include the DB name (e.g. mongodb+srv://user:pass@cluster0.mongodb.net/handmade_crafts).\n  - URL-encode special characters in your password.\n  - Ensure Atlas Network Access (IP Access List) allows connections from Render.');
+console.log('ℹ️ Tip: On Render set the environment variable MONGO_URI to the full connection string.');
 
 let connectedOnce = false;
 
-async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = MONGO_RETRY_DELAY_MS) {
->>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
+async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = MONGO_RETRY_DELAY_MS, insecure = false) {
   try {
     // Note: avoid deprecated options; modern drivers don't need useNewUrlParser/useUnifiedTopology
     await mongoose.connect(MONGO_URI, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
-<<<<<<< HEAD
-      // If this connection attempt is marked insecure, allow invalid certs
-      ...(insecure ? { tlsAllowInvalidCertificates: true } : {}),
-      // Also respect explicit env toggle
-      ...(process.env.MONGO_INSECURE === 'true' && !insecure ? { tlsAllowInvalidCertificates: true } : {})
-=======
       dbName: MONGO_DBNAME,
       // Allow insecure TLS for development if explicitly requested via env (NOT recommended for prod)
-      ...(process.env.MONGO_INSECURE === 'true' ? { tlsAllowInvalidCertificates: true } : {})
->>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
+      ...(process.env.MONGO_INSECURE === 'true' || insecure ? { tlsAllowInvalidCertificates: true } : {})
     });
 
     connectedOnce = true;
     app.locals.dbConnected = true;
     console.log('✅ Connected to MongoDB successfully');
-<<<<<<< HEAD
     console.log('🗄️  Database:', mongoose.connection.name);
-=======
-  console.log('🗄️  Database:', mongoose.connection.name);
-  console.log(`ℹ️ Using dbName option (from MONGO_DBNAME or default): ${MONGO_DBNAME}`);
->>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
+    console.log(`ℹ️ Using dbName option (from MONGO_DBNAME or default): ${MONGO_DBNAME}`);
     console.log('📱 Host:', mongoose.connection.host);
     console.log('🔌 Port:', mongoose.connection.port);
 
@@ -102,6 +73,7 @@ async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = M
     // Seed demo products only after successful connection
     try {
       const Product = require('./models/Product');
+      // Seed demo products. Mark them as 'approved' so they appear on the Home page.
       const demoProducts = [
         { name: 'Handwoven Basket', price: '₹499', material: 'Natural Jute', rating: 4.5, image: 'download.jpeg', stock: 10 },
         { name: 'Clay Pot', price: '₹299', material: 'clay', rating: 4.2, image: 'clay pot.jpeg', stock: 12 },
@@ -113,8 +85,13 @@ async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = M
       for (const dp of demoProducts) {
         const exists = await Product.findOne({ name: dp.name, owner: 'system' });
         if (!exists) {
-          await Product.create({ ...dp, owner: 'system' });
+          await Product.create({ ...dp, owner: 'system', status: 'approved' });
           console.log(`🧩 Seeded demo product: ${dp.name}`);
+        } else if (exists.status !== 'approved') {
+          // If a demo product exists but is still pending/rejected, mark it approved so it shows on the frontend.
+          exists.status = 'approved';
+          await exists.save();
+          console.log(`🔄 Updated demo product status to approved: ${dp.name}`);
         }
       }
     } catch (prodSeedErr) {
@@ -124,7 +101,6 @@ async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = M
   } catch (err) {
     app.locals.dbConnected = false;
     console.error(`❌ MongoDB connection attempt failed: ${err && err.message ? err.message : err}`);
-<<<<<<< HEAD
 
     // If we see TLS/SSL related errors, try one immediate retry with insecure TLS (allow invalid certs).
     const isTlsError = err && err.message && /SSL|TLS|tls1_alert|tlsv1/i.test(err.message);
@@ -138,12 +114,6 @@ async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = M
       console.log(`⏳ Retrying MongoDB connection in ${delayMs}ms (${attemptsLeft - 1} attempts left)...`);
       await new Promise(res => setTimeout(res, delayMs));
       return connectWithRetry(attemptsLeft - 1, Math.min(delayMs * 2, 60000), insecure);
-=======
-    if (attemptsLeft > 0) {
-      console.log(`⏳ Retrying MongoDB connection in ${delayMs}ms (${attemptsLeft - 1} attempts left)...`);
-      await new Promise(res => setTimeout(res, delayMs));
-      return connectWithRetry(attemptsLeft - 1, Math.min(delayMs * 2, 60000));
->>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
     }
 
     // Final failure after retries
@@ -174,6 +144,19 @@ mongoose.connection.on('disconnected', () => {
 mongoose.connection.on('reconnected', () => {
   console.log('🔄 MongoDB reconnected');
   app.locals.dbConnected = true;
+});
+
+// Expose a small debug endpoint to confirm which DB we're connected to
+app.get('/api/db-info', (req, res) => {
+  try {
+    const readyState = mongoose.connection.readyState;
+    const host = mongoose.connection.host || null;
+    const dbName = mongoose.connection.name || MONGO_DBNAME;
+    const isAtlas = /^mongodb\+srv:/i.test(MONGO_URI) || /atlas/i.test(MONGO_URI);
+    res.json({ uriType: isAtlas ? 'atlas' : 'local', host, dbName, readyState });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not determine DB info', error: err.message });
+  }
 });
 
 // Routes
@@ -286,11 +269,6 @@ app.use((err, req, res, next) => {
     error: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
   });
 });
-
-<<<<<<< HEAD
-// 404 handler (Express 5 safe - no wildcard path)
-app.use((req, res) => {
-=======
 // Serve frontend build (if present) and fallback to index.html for SPA routes.
 // This must come AFTER API routes so /api/* is handled by the API.
 const DIST_DIR = path.resolve(__dirname, '..', 'dist');
@@ -317,7 +295,6 @@ app.use((req, res) => {
   }
 
   // Default JSON 404 for API or when frontend not available
->>>>>>> b20a3629c6727b9dbf43b803b1c51c5cb2b1e577
   res.status(404).json({ message: 'Route not found' });
 });
 

@@ -175,7 +175,7 @@ router.put('/:id/reject', async (req, res) => {
   }
 });
 
-// Update product stock after order
+// Update product stock after order (buyer reduction) at '/:id/stock'
 router.put('/:id/stock', async (req, res) => {
   try {
     const { reduceBy } = req.body;
@@ -223,25 +223,6 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Admin: Update stock
-router.put('/:id/stock', async (req, res) => {
-  try {
-    const { stock } = req.body;
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      { 
-        stock: Number(stock),
-        inStock: Number(stock) > 0
-      },
-      { new: true }
-    );
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-    res.json({ message: 'Stock updated successfully', product });
-  } catch (error) {
-    res.status(500).json({ message: 'Error updating stock', error: error.message });
-  }
-});
-
+// NOTE: Removed duplicate admin PUT '/:id/stock' at bottom to avoid route conflicts.
+// Admin stock updates are handled at '/:id/admin/stock'.
 module.exports = router;

@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const Cart = require('../models/Cart'); // Make sure Cart.js is capitalized
+const Cart = require('../models/Cart');
 
-// Fix admin key to use env variable
 const ADMIN_KEY = process.env.ADMIN_KEY || 'local-admin-key';
 
 // Save or update user's cart
@@ -27,12 +26,11 @@ router.post('/save', async (req, res) => {
   }
 });
 
-// Admin: Delete cart
-router.delete('/:userEmail', async (req, res) => {
+// Admin: Delete cart (explicit admin path)
+router.delete('/admin/:userEmail', async (req, res) => {
   try {
     const key = req.headers['x-admin-key'];
     if (key !== ADMIN_KEY) return res.status(401).json({ message: 'Unauthorized' });
-    
     await Cart.findOneAndDelete({ userEmail: req.params.userEmail });
     res.json({ message: 'Cart deleted successfully' });
   } catch (error) {
@@ -55,7 +53,7 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// Get cart by email
+// Get cart by email (user)
 router.get('/:userEmail', async (req, res) => {
   try {
     const cart = await Cart.findOne({ userEmail: req.params.userEmail });
@@ -70,8 +68,8 @@ router.get('/:userEmail', async (req, res) => {
   }
 });
 
-// Clear cart for a user
-router.delete('/:userEmail', async (req, res) => {
+// Clear cart for a user (user-facing)
+router.delete('/clear/:userEmail', async (req, res) => {
   try {
     await Cart.deleteMany({ userEmail: req.params.userEmail });
     res.json({ message: 'Cart cleared successfully' });

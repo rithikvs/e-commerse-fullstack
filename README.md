@@ -181,3 +181,20 @@ If you encounter any issues:
 ---
 
 **Happy Crafting! 🎨✨**
+
+## MongoDB Atlas troubleshooting
+
+If you're using MongoDB Atlas and the backend can't connect, try the following:
+
+- Make sure your `MONGO_URI` includes a database name. Example:
+
+```env
+MONGO_URI=mongodb+srv://<username>:<password>@cluster0.dy1cheo.mongodb.net/handmade_crafts?retryWrites=true&w=majority
+```
+
+- In the Atlas UI under Network Access, add an IP access entry for your machine (or `0.0.0.0/0` for development).
+- Ensure the database user exists and the username/password in `MONGO_URI` are correct.
+- If you see TLS/SSL errors locally, you can set `MONGO_INSECURE=true` in `backend/.env` to allow invalid certs for development only (not recommended in production).
+- If using `mongodb+srv://` and your machine can't resolve DNS records, try the full `mongodb://` connection string from Atlas (it includes explicit hostnames) or verify DNS and firewall settings.
+
+If problems persist, run the server and inspect the startup logs — the backend prints detailed diagnostics to help identify DNS, TLS, or auth failures.
