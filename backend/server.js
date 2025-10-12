@@ -3,7 +3,16 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config();
+// Load .env only when MONGO_URI isn't already provided by the environment.
+// This prevents dotenv from overwriting Render/production environment variables.
+if (!process.env.MONGO_URI && !process.env.MONGODB_URI) {
+  // load backend/.env if present
+  const envPath = require('path').resolve(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    require('dotenv').config({ path: envPath });
+    console.log(`ℹ️ Loaded environment from ${envPath}`);
+  }
+}
 
 const app = express();
 app.use(cors({ origin: true, credentials: true, allowedHeaders: ['Content-Type', 'x-admin-key'] }));
@@ -32,8 +41,17 @@ try {
   console.warn('Could not normalize MONGO_URI:', e && e.message ? e.message : e);
 }
 
+function maskUri(uri) {
+  try {
+    // Remove credentials if present: mongodb+srv://user:pass@host => mongodb+srv://***:***@host
+    return uri.replace(/:\/\/.*?:.*?@/, '://***:***@');
+  } catch (e) {
+    return uri;
+  }
+}
+
 console.log('🔗 Attempting to connect to MongoDB...');
-console.log('📡 Connection string:', MONGO_URI);
+console.log('📡 Connection string:', maskUri(MONGO_URI));
 console.log('ℹ️ Tip: On Render set the environment variable MONGO_URI to the full connection string.');
 
 let connectedOnce = false;
@@ -100,14 +118,31 @@ async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = M
 
   } catch (err) {
     app.locals.dbConnected = false;
-    console.error(`❌ MongoDB connection attempt failed: ${err && err.message ? err.message : err}`);
+    const msg = err && err.message ? err.message : String(err);
+    console.error(`❌ MongoDB connection attempt failed: ${msg}`);
 
-    // If we see TLS/SSL related errors, try one immediate retry with insecure TLS (allow invalid certs).
-    const isTlsError = err && err.message && /SSL|TLS|tls1_alert|tlsv1/i.test(err.message);
+    // Detect common Atlas/network/TLS errors and print actionable guidance
+    const isTlsError = /SSL|TLS|tls1_alert|tlsv1|tlsv1_alert/i.test(msg);
+    const isWhitelistError = /whitelist|ip|IP|not authorized|Could not connect to any servers/i.test(msg) || /ECONNREFUSED/i.test(msg);
+
     if (isTlsError && !insecure) {
-      console.warn('⚠️  TLS/SSL error detected while connecting to MongoDB. Retrying once with tlsAllowInvalidCertificates=true (insecure).');
+      console.warn('⚠️ TLS/SSL error detected while connecting to MongoDB.');
+      console.warn('   If you are on a managed hosting platform you may need to ensure outbound TLS is allowed.');
+      console.warn('   You can retry with invalid TLS (not recommended) by setting MONGO_INSECURE=true for debugging only.');
+      console.warn('   Example (Render env var): MONGO_INSECURE=true');
       // try insecure retry immediately (do not reduce attemptsLeft for this forced insecure path)
       return connectWithRetry(attemptsLeft, delayMs, true);
+    }
+
+    if (isWhitelistError) {
+      console.warn('⚠️ Possible network/whitelist issue detected when connecting to Atlas.');
+      console.warn('   Common fixes:');
+      console.warn('   - Add your host IP or Render outbound IPs to your Atlas Network Access (IP Whitelist)');
+      console.warn('     https://www.mongodb.com/docs/atlas/security-whitelist/');
+      console.warn('   - Temporarily allow access from anywhere (0.0.0.0/0) for testing (not recommended for production)');
+      console.warn('   - Use MongoDB Atlas Data API or VPC peering for production deployments');
+      console.warn('   - Ensure your MONGO_URI is correct and includes proper credentials');
+      console.warn('   Render docs: https://render.com/docs');
     }
 
     if (attemptsLeft > 0) {
@@ -119,10 +154,6 @@ async function connectWithRetry(attemptsLeft = MONGO_RETRY_ATTEMPTS, delayMs = M
     // Final failure after retries
     console.error('❌ MongoDB connection error: all retry attempts exhausted.');
     console.warn('⚠️ The API will continue running but database-dependent features will be limited.');
-    console.warn('ℹ️ Common fixes:');
-    console.warn('- Ensure your Atlas IP whitelist includes this host.');
-    console.warn('- Check your MONGO_URI and credentials.');
-    console.warn('- For development, set MONGO_INSECURE=true (not recommended for production).');
     // do not throw — allow server to stay up (fallback endpoints may operate in limited mode)
   }
 }
