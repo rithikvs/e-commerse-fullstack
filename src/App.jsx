@@ -119,7 +119,26 @@ function AppContent() {
   // Save cart to localStorage whenever cartItems changes
   useEffect(() => {
     localStorage.setItem('cartItems', JSON.stringify(cartItems));
+    // If user is logged in, persist cart to backend as well
+    if (user?.email) {
+      saveCartToDB(cartItems);
+    }
   }, [cartItems]);
+
+  // Listen for external cart-updated events (e.g. Reorder from MyOrders)
+  useEffect(() => {
+    const handler = (e) => {
+      try {
+        const items = (e && e.detail) ? e.detail : JSON.parse(localStorage.getItem('cartItems') || '[]');
+        setCartItems(items);
+        if (user?.email) saveCartToDB(items);
+      } catch (err) {
+        console.error('Error handling cart-updated event', err);
+      }
+    };
+    window.addEventListener('cart-updated', handler);
+    return () => window.removeEventListener('cart-updated', handler);
+  }, [user]);
 
   // Check if user is authenticated and is admin
   const isAdmin = user?.isAdmin && user?.adminKey;
