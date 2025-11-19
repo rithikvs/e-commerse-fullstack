@@ -12,8 +12,20 @@ function Payment({ cartItems: propCartItems }) {
     cvv: '',
     nameOnCard: ''
   });
-  const [orderProcessing, setOrderProcessing] = useState(false);
   const user = JSON.parse(localStorage.getItem('currentUser'));
+  const [shippingDetails, setShippingDetails] = useState(() => ({
+    fullName: user?.username || '',
+    email: user?.email || '',
+    address: '',
+    city: '',
+    postalCode: ''
+  }));
+
+  const handleShippingChange = (e) => {
+    const { name, value } = e.target;
+    setShippingDetails(prev => ({ ...prev, [name]: value }));
+  };
+  const [orderProcessing, setOrderProcessing] = useState(false);
 
   // Get cart items from location state or props
   const cartItems = location.state?.cartItems || propCartItems || [];
@@ -90,16 +102,8 @@ function Payment({ cartItems: propCartItems }) {
   const processOrder = async () => {
     setOrderProcessing(true);
     try {
-      // Validate form fields
-      const formValues = {
-        fullName: document.querySelector('input[placeholder="Enter your full name"]').value,
-        email: document.querySelector('input[placeholder="Enter your email"]').value,
-        address: document.querySelector('input[placeholder="Enter your address"]').value,
-        city: document.querySelector('input[placeholder="Enter city"]').value,
-        postalCode: document.querySelector('input[placeholder="Enter postal code"]').value
-      };
-
-      if (!formValues.fullName || !formValues.email || !formValues.address || !formValues.city || !formValues.postalCode) {
+      // Validate form fields (use controlled state)
+      if (!shippingDetails.fullName || !shippingDetails.email || !shippingDetails.address || !shippingDetails.city || !shippingDetails.postalCode) {
         throw new Error('Please fill all shipping details');
       }
 
@@ -134,14 +138,7 @@ function Payment({ cartItems: propCartItems }) {
         material: item.material
       }));
 
-      // Get shipping details from form
-      const shippingDetails = {
-        fullName: document.querySelector('input[placeholder="Enter your full name"]').value,
-        email: document.querySelector('input[placeholder="Enter your email"]').value,
-        address: document.querySelector('input[placeholder="Enter your address"]').value,
-        city: document.querySelector('input[placeholder="Enter city"]').value,
-        postalCode: document.querySelector('input[placeholder="Enter postal code"]').value
-      };
+      // shippingDetails already comes from controlled state
 
       const orderPayload = {
         userEmail: user?.email || shippingDetails.email,
@@ -221,28 +218,63 @@ function Payment({ cartItems: propCartItems }) {
         <form style={styles.form} onSubmit={handleSubmit}>
           <div style={styles.formGroup}>
             <label style={styles.label}>Full Name</label>
-            <input type="text" placeholder="Enter your full name" style={styles.input} />
+            <input
+              type="text"
+              name="fullName"
+              placeholder="Enter your full name"
+              style={styles.input}
+              value={shippingDetails.fullName}
+              onChange={handleShippingChange}
+            />
           </div>
-          
+
           <div style={styles.formGroup}>
             <label style={styles.label}>Email Address</label>
-            <input type="email" placeholder="Enter your email" style={styles.input} />
+            <input
+              type="email"
+              name="email"
+              placeholder="Enter your email"
+              style={styles.input}
+              value={shippingDetails.email}
+              onChange={handleShippingChange}
+            />
           </div>
-          
+
           <div style={styles.formGroup}>
             <label style={styles.label}>Shipping Address</label>
-            <input type="text" placeholder="Enter your address" style={styles.input} />
+            <input
+              type="text"
+              name="address"
+              placeholder="Enter your address"
+              style={styles.input}
+              value={shippingDetails.address}
+              onChange={handleShippingChange}
+            />
           </div>
-          
+
           <div style={styles.row}>
             <div style={styles.formGroup}>
               <label style={styles.label}>City</label>
-              <input type="text" placeholder="Enter city" style={styles.input} />
+              <input
+                type="text"
+                name="city"
+                placeholder="Enter city"
+                style={styles.input}
+                value={shippingDetails.city}
+                onChange={handleShippingChange}
+              />
             </div>
-            
+
             <div style={styles.formGroup}>
               <label style={styles.label}>Postal Code</label>
-              <input type="text" placeholder="Enter postal code" style={styles.input} />
+              <input
+                type="text"
+                name="postalCode"
+                placeholder="Enter postal code"
+                style={styles.input}
+                value={shippingDetails.postalCode}
+                onChange={handleShippingChange}
+              />
             </div>
           </div>
           
