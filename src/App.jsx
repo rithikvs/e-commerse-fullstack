@@ -5,6 +5,7 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import Cart from './pages/Cart';
 import Payment from './pages/Payment';
+import MyOrders from './pages/MyOrders';
 import LoginRegister from './pages/LoginRegister';
 import Sell from './pages/Sell';
 import AdminPanel from './pages/AdminPanel';
@@ -160,6 +161,7 @@ function AppContent() {
             <Link to="/about" className="nav-link" style={styles.navLink}>About</Link>
             <Link to="/contact" className="nav-link" style={styles.navLink}>Contact</Link>
             <Link to="/cart" className="nav-link" style={styles.navLink}>Cart ({cartItems.length})</Link>
+            <Link to="/my-orders" className="nav-link" style={styles.navLink}>My Orders</Link>
             <Link to="/sell" className="nav-link" style={styles.navLink}>Sell</Link>
           </>
         )}
@@ -207,6 +209,11 @@ function AppContent() {
             <Route path="/payment" element={
               <ProtectedRoute>
                 <Payment cartItems={cartItems} />
+              </ProtectedRoute>
+            } />
+            <Route path="/my-orders" element={
+              <ProtectedRoute>
+                <MyOrders />
               </ProtectedRoute>
             } />
             <Route path="/sell" element={

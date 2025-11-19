@@ -68,6 +68,7 @@ function Payment({ cartItems: propCartItems }) {
   }, []);
 
   // Helper: retry POST to /api/orders
+  // Helper: retry POST to /api/orders — returns true on success, false on failure
   const saveOrderWithRetry = async (orderPayload, retries = 3) => {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
@@ -150,12 +151,12 @@ function Payment({ cartItems: propCartItems }) {
         orderStatus: 'placed'
       };
 
-      // Attempt to save order with retries
+      // Attempt to save order with retries — returns boolean
       const saved = await saveOrderWithRetry(orderPayload, 3);
       if (!saved) {
         // If save ultimately fails, queue for automatic background retry
         queueOrderForLater(orderPayload);
-        alert('Order placed successfully, but saving to the server failed. The app has queued the order and will retry automatically.');
+        alert('Order placed locally, but saving to the server failed. The app queued the order and will retry.');
       } else {
         alert('Order placed successfully!');
       }

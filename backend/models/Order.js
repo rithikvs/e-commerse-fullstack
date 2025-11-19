@@ -39,6 +39,13 @@ const orderSchema = new mongoose.Schema({
     enum: ['placed', 'confirmed', 'shipped', 'delivered'],
     default: 'placed'
   }
+  ,
+  // history of status changes for tracking UI
+  statusHistory: [{
+    status: String,
+    timestamp: Date,
+    note: String
+  }]
 }, {
   timestamps: true
 });
