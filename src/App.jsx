@@ -26,7 +26,7 @@ function AppContent() {
   // Fetch cart from MongoDB when user logs in
   useEffect(() => {
     if (user?.email) {
-      fetch(`http://localhost:5000/api/cart/${user.email}`)
+      fetch(`https://e-commerse-fullstack-1.onrender.com/api/cart/${user.email}`)
         .then(res => res.json())
         .then(data => {
           setCartItems(data?.items || []);
@@ -48,7 +48,7 @@ function AppContent() {
       quantity: p.quantity ? Number(p.quantity) : 1
     }));
     try {
-      const response = await fetch('http://localhost:5000/api/cart/save', {
+      const response = await fetch('https://e-commerse-fullstack-1.onrender.com/api/cart/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userEmail: user.email, items: normalizedItems })

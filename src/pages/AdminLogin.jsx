@@ -31,10 +31,10 @@ function AdminLogin() {
     try {
       let data;
       try {
-        data = await doLogin('http://localhost:5000/api/auth/admin/login');
+        data = await doLogin('https://e-commerse-fullstack-1.onrender.com/api/auth/admin/login');
       } catch (err) {
         // fallback
-        data = await doLogin('http://localhost:5000/api/admin/login');
+        data = await doLogin('https://e-commerse-fullstack-1.onrender.com/api/admin/login');
       }
       localStorage.setItem('adminKey', data.adminKey);
       // Mark currentUser as admin so the SPA UI switches to admin-only mode

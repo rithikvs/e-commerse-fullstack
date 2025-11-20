@@ -31,7 +31,7 @@ function LoginRegister({ onLogin }) {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/register', {
+      const res = await fetch('https://e-commerse-fullstack-1.onrender.com/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -53,8 +53,8 @@ function LoginRegister({ onLogin }) {
     setLoading(true);
     try {
       const endpoint = userType === 'admin' 
-        ? 'http://localhost:5000/api/auth/admin/login'
-        : 'http://localhost:5000/api/auth/login';
+        ? 'https://e-commerse-fullstack-1.onrender.com/api/auth/admin/login'
+        : 'https://e-commerse-fullstack-1.onrender.com/api/auth/login';
 
       const res = await fetch(endpoint, {
         method: 'POST',

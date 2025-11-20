@@ -12,7 +12,7 @@ export default function OrderTracking() {
     const fetchOrder = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:5000/api/orders/${id}`);
+        const res = await fetch(`https://e-commerse-fullstack-1.onrender.com/api/orders/${id}`);
         if (!res.ok) throw new Error('Order not found');
         const data = await res.json();
         setOrder(data);

@@ -60,7 +60,7 @@ function Home({ addToCart }) {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/products');
+        const res = await fetch('https://e-commerse-fullstack-1.onrender.com/api/products');
         const dbProducts = await res.json();
         // Only show approved products
         const approvedProducts = dbProducts.filter(p => p.status === 'approved');
@@ -110,7 +110,7 @@ function Home({ addToCart }) {
     // If product is from backend and owned by user
     if (product && product._id && user?.email && product.owner === user.email) {
       try {
-        await fetch(`http://localhost:5000/api/products/${product._id}/${user.email}`, {
+        await fetch(`https://e-commerse-fullstack-1.onrender.com/api/products/${product._id}/${user.email}`, {
           method: 'DELETE'
         });
         setAllProducts(prev => prev.filter(p => p._id !== product._id));

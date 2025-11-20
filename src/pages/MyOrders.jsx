@@ -19,7 +19,7 @@ export default function MyOrders() {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`http://localhost:5000/api/orders/user/${encodeURIComponent(user.email)}`);
+        const res = await fetch(`https://e-commerse-fullstack-1.onrender.com/api/orders/user/${encodeURIComponent(user.email)}`);
         if (!res.ok) throw new Error('Failed to fetch orders');
         const data = await res.json();
         setOrders(data || []);
@@ -64,7 +64,7 @@ export default function MyOrders() {
       await Promise.all(merged.map(async (it) => {
         if ((!it.image || it.image === '') && it.productId) {
           try {
-            const res = await fetch(`http://localhost:5000/api/products/${it.productId}`);
+            const res = await fetch(`https://e-commerse-fullstack-1.onrender.com/api/products/${it.productId}`);
             if (res.ok) {
               const p = await res.json();
               if (p && p.image) it.image = p.image;

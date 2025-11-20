@@ -72,7 +72,7 @@ function Payment({ cartItems: propCartItems }) {
   const saveOrderWithRetry = async (orderPayload, retries = 3) => {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const orderResponse = await fetch('http://localhost:5000/api/orders', {
+        const orderResponse = await fetch('https://e-commerse-fullstack-1.onrender.com/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderPayload)
@@ -114,7 +114,7 @@ function Payment({ cartItems: propCartItems }) {
         const quantity = item.quantity || 1;
 
         // Update product stock
-        const response = await fetch(`http://localhost:5000/api/products/${productId}/stock`, {
+        const response = await fetch(`https://e-commerse-fullstack-1.onrender.com/api/products/${productId}/stock`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
@@ -165,7 +165,7 @@ function Payment({ cartItems: propCartItems }) {
       if (user?.email) {
         try {
           // Get current cart
-          const cartResponse = await fetch(`http://localhost:5000/api/cart/${user.email}`);
+          const cartResponse = await fetch(`https://e-commerse-fullstack-1.onrender.com/api/cart/${user.email}`);
           const currentCart = await cartResponse.json();
           
           // Remove purchased items
@@ -177,7 +177,7 @@ function Payment({ cartItems: propCartItems }) {
           ) || [];
 
           // Update cart
-          await fetch('http://localhost:5000/api/cart/save', {
+          await fetch('https://e-commerse-fullstack-1.onrender.com/api/cart/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
